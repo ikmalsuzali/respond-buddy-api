@@ -45,8 +45,14 @@ export function stripeRoutes(fastify: FastifyInstance) {
   fastify.post(
     "/api/v1/checkout-session",
     async (request: FastifyRequest, reply: FastifyReply) => {
-      let { price_id, pet_id, user_id, success_url, cancel_url } =
-        request.body as checkoutSessionRequestType;
+      let {
+        price_id,
+        additional_prices,
+        pet_id,
+        user_id,
+        success_url,
+        cancel_url,
+      } = request.body as checkoutSessionRequestType;
 
       let payment = await getFirstPaymentSuccess(pet_id);
       if (payment) {
@@ -99,6 +105,7 @@ export function stripeRoutes(fastify: FastifyInstance) {
           automatic_tax: {
             enabled: true,
           },
+          add_invoice_items: additional_prices,
           payment_intent_data: {
             metadata: {
               client_reference_id: paymentResponse?.id,
@@ -216,5 +223,27 @@ export function stripeRoutes(fastify: FastifyInstance) {
     });
 
     return payment;
+  };
+
+  const createStripeCustomer = async (customer: string) => {
+    const customerResponse = await stripeClient.customers.create({
+      email: customer,
+    });
+
+    return customerResponse;
+  };
+
+  const getCustomerById = async (customerId: string) => {
+    const customer = await stripeClient.customers.retrieve(customerId);
+
+    return customer;
+  };
+
+  const deleteSubscription = async (subscriptionId: string) => {
+    const deletedSubscription = await stripeClient.subscriptions.del(
+      subscriptionId
+    );
+
+    return deletedSubscription;
   };
 }

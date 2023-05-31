@@ -2,6 +2,8 @@
 import "../helpers/bigInt.js";
 import { FastifyReply } from "fastify";
 import { FastifyInstance, FastifyRequest } from "fastify";
+import { prisma } from "../prisma";
+
 // @ts-ignore
 import { slack } from "../main";
 
@@ -21,6 +23,49 @@ export function hookRoutes(fastify: FastifyInstance) {
       }
     }
   });
+
+  fastify.post(
+    "/api/v1/hook/workspace/create",
+    async (request: FastifyRequest) => {
+      let event = request.body;
+      // @ts-ignore
+      if (slack) {
+        slack.alert({
+          channel: "#notify",
+          text: `Workspace created: ${JSON.stringify(event)}`,
+        });
+      }
+      if (event?.type == "CREATE") {
+        let stripeCustomerCreation = createStripeCustomer(
+          event.record.name,
+          event.record.email
+        );
+        updateWorkspace(event.record.workspace, {
+          stripe_payment_id: stripeCustomerCreation.id,
+        });
+      }
+    }
+  );
+
+  fastify.post(
+    "/api/v1/hook/workspace/update",
+    async (request: FastifyRequest) => {
+      let event = request.body;
+      // @ts-ignore
+      if (slack) {
+        slack.alert({
+          channel: "#notify",
+          text: `Workspace created: ${JSON.stringify(event)}`,
+        });
+      }
+      if (event?.type == "UPDATE") {
+        updateStripeCustomer(event.record.workspace, {
+          email: event.record.email,
+          name: event.record.name,
+        });
+      }
+    }
+  );
 
   fastify.post("/api/v1/hook/create-pet", async (request: FastifyRequest) => {
     let event = request.body;
@@ -84,6 +129,43 @@ export function hookRoutes(fastify: FastifyInstance) {
       }
     }
   });
+
+  const createStripeCustomer = async (name: string, email: string) => {
+    const customerResponse = await stripeClient.customers.create({
+      name,
+      email,
+    });
+
+    return customerResponse;
+  };
+
+  const updateStripeCustomer = async (customerId, updateData) => {
+    try {
+      const updatedCustomer = await stripe.customers.update(
+        customerId,
+        updateData
+      );
+
+      return updatedCustomer;
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const updateWorkspace = async (workspaceId, updateData) => {
+    try {
+      const updatedWorkspace = await prisma.workspaces.update({
+        where: {
+          id: workspaceId,
+        },
+        data: updateData,
+      });
+
+      return updatedWorkspace;
+    } catch (error) {
+      throw error;
+    }
+  };
 
   // const sendFoundPetEmail = (payload) => {};
 
