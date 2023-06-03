@@ -37,18 +37,11 @@ export function messageEvents(fastify: FastifyInstance) {
       data.workspace_integration_id
     );
 
-    console.log(
-      "🚀 ~ file: message.ts:32 ~ eventManager.on ~ workspaceIntegration:",
-      workspaceIntegration?.workspace
-    );
     const allWorkspaceAndSystemTags = await getWorkspaceTags(
       // @ts-ignore
       workspaceIntegration?.workspace
     );
-    console.log(
-      "🚀 ~ file: message.ts:39 ~ eventManager.on ~ allWorkspaceAndSystemTags:",
-      allWorkspaceAndSystemTags
-    );
+
     // 2. Categorize the prompt
 
     // try {
@@ -64,8 +57,6 @@ export function messageEvents(fastify: FastifyInstance) {
       workspaceId: workspaceIntegration!.workspace!,
     });
 
-    console.log(stores);
-
     let foundDocs: Document<Record<string, any>>[] = [];
 
     for (const store of stores) {
@@ -78,7 +69,10 @@ export function messageEvents(fastify: FastifyInstance) {
       foundDocs = [...foundDocs, ...similarDocs];
     }
 
-    console.log(foundDocs);
+    console.log(
+      "🚀 ~ file: message.ts:70 ~ eventManager.on ~ foundDocs:",
+      foundDocs
+    );
 
     const vectorStore = await MemoryVectorStore.fromDocuments(
       foundDocs,
@@ -92,15 +86,15 @@ export function messageEvents(fastify: FastifyInstance) {
       query: data.message,
     });
 
-    console.log(res);
-
-    slackClientManager.sendMessage({
-      workspace_integration_id: data.workspace_integration_id,
-      channel: data?.metaData.channel,
-      message: res.text,
-      thread_ts: data?.metaData.thread_ts,
-      ts: data?.metaData.ts,
-    });
+    if (data.type === "slack") {
+      slackClientManager.sendMessage({
+        workspace_integration_id: data.workspace_integration_id,
+        channel: data?.metaData.channel,
+        message: res.text,
+        thread_ts: data?.metaData.thread_ts,
+        ts: data?.metaData.ts,
+      });
+    }
 
     // 3. Get the vector stores related
     // 4. Search for the similarities in the vector stores
