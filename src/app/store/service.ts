@@ -25,30 +25,18 @@ import { prisma } from "../../prisma";
 // 3. Save all the tags related to the store
 
 export const saveStore = async (attrs: any) => {
-  const { output_text, workspace_id, type, tags, url } = attrs;
-  let docs = null;
-
-  if (type === "raw") {
-    const textSplitter = new RecursiveCharacterTextSplitter({
-      chunkSize: 1000,
-      chunkOverlap: 100,
-    });
-    docs = await textSplitter.createDocuments([output_text]);
-    console.log("🚀 ~ file: service.ts:36 ~ saveStore ~ docs:", docs);
-  }
+  const { workspaceId, type, tags, url, docs } = attrs;
 
   const store = await prisma.store.create({
     data: {
-      output_text,
       type,
-      workspace: workspace_id,
+      workspace: workspaceId,
     },
   });
-  console.log("🚀 ~ file: service.ts:46 ~ saveStore ~ store:", store);
 
   storeDocsToRedis({
     docs,
-    workspaceId: workspace_id,
+    workspaceId: workspaceId,
     storeId: store.id,
     tags,
   });
@@ -59,7 +47,7 @@ export const saveStore = async (attrs: any) => {
   for (const tag of tags) {
     const { createdTag, error } = await getOrCreateTag({
       name: tag.name,
-      workspaceId: workspace_id,
+      workspaceId: workspaceId,
       description: tag.description,
       ai_default_response: tag.ai_default_response,
     });
@@ -87,21 +75,59 @@ export const getTextByRaw = async (text: string) => {
 export const getTextByWebsiteURL = async (url: string) => {
   if (premiumWebsiteUrl.includes(url))
     throw new Error("Premium websites are not available for now");
+
+  console.log("🚀 ~ file: service.ts:89 ~ getTextByWebsiteURL ~ url:", url);
+
   try {
     // Fetch the HTML content of the website
     const response = await axios.get(url);
+    console.log(
+      "🚀 ~ file: service.ts:96 ~ getTextByWebsiteURL ~ response:",
+      response
+    );
     const html = response.data;
 
     // Load the HTML into Cheerio
     const $ = cheerio.load(html);
 
     // Extract all the text from the HTML
-    const extractedText = $("body").text();
+    const title = $("title").text();
+    const metaDescription = $('meta[name="description"]').attr("content");
+    const headings = $("h1, h2, h3")
+      .map((index, element) => $(element).html())
+      .get();
+    const links = $("a")
+      .filter((index, element) => $(element).children("img").length === 0) // Exclude <a> tags with <img> children
+      .map((index, element) => $(element).html())
+      .get();
+
+    const remappedHTML = `
+    <html>
+      <head>
+        <title>${title}</title>
+        <meta name="description" content="${metaDescription}">
+      </head>
+      <body>
+        <h1>Headings:</h1>
+        <ul>
+          ${headings.map((heading) => `<li>${heading}</li>`).join("")}
+        </ul>
+        <h1>Links:</h1>
+        <ul>
+          ${links.map((link) => `<li>${link}</li>`).join("")}
+        </ul>
+      </body>
+    </html>
+  `;
 
     // Print the extracted text
-    console.log(extractedText);
-    return extractedText;
+    console.log(remappedHTML);
+    return remappedHTML;
   } catch (error) {
+    console.log(
+      "🚀 ~ file: service.ts:109 ~ getTextByWebsiteURL ~ error:",
+      error
+    );
     throw error;
   }
 };

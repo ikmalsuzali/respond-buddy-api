@@ -50,18 +50,21 @@ export function messageEvents(fastify: FastifyInstance) {
       allWorkspaceAndSystemTags
     );
     // 2. Categorize the prompt
-    const matchedTags = await tagSearch(
-      allWorkspaceAndSystemTags,
-      data.message
-    );
+
+    // try {
+    //   const matchedTags = await tagSearch(
+    //     allWorkspaceAndSystemTags,
+    //     data.message
+    //   );
+    // } catch {
+    //   console.log("No tags found");
+    // }
 
     const stores = await getStoreByWorkspaceId({
       workspaceId: workspaceIntegration!.workspace!,
     });
 
     console.log(stores);
-
-    console.log(matchedTags);
 
     let foundDocs: Document<Record<string, any>>[] = [];
 

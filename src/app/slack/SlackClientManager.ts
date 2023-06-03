@@ -45,12 +45,7 @@ class SlackClientManager {
 
         this.clients[config.workspace_integration_id]?.app.message(
           async ({ message }) => {
-            console.log(
-              "🚀 ~ !!!file: SlackClientManager.ts:44 ~ SlackClientManager ~ message:",
-              message
-            );
-
-            if (message.text) {
+            if (message.text && message.text.includes(`@RespondBuddy`)) {
               eventManager.emit("workflow", {
                 type: "slack",
                 workspace_integration_id: config.workspace_integration_id,
@@ -58,14 +53,6 @@ class SlackClientManager {
                 metaData: message,
               });
             }
-
-            // this.sendMessage({
-            //   workspace_integration_id: config.workspace_integration_id,
-            //   channel: message.channel,
-            //   message: "Hello world!",
-            //   thread_ts: message.thread_ts,
-            //   ts: message.ts,
-            // });
           }
         );
 

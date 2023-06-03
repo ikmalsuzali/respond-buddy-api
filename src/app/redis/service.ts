@@ -51,20 +51,14 @@ export const getDocsFromRedis = async ({
 }) => {
   try {
     const vectorStore = new RedisVectorStore(new OpenAIEmbeddings(), {
-      // @ts-ignore
       redisClient: redisClient,
       indexName: `${workspaceId}:${storeId}`,
     });
-    console.log(
-      "🚀 ~ file: service.ts:58 ~ vectorStore ~ vectorStore:",
-      vectorStore
-    );
 
     const simpleRes = await vectorStore.similaritySearch(
       message,
       similarityCount
     );
-    console.log("🚀 ~ file: service.ts:65 ~ simpleRes:", simpleRes);
 
     return simpleRes || [];
   } catch (error) {

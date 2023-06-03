@@ -25,7 +25,7 @@ const { App } = require("@slack/bolt");
 
 let slack = null;
 let logger = null;
-let redisClient = null;
+let redisClient: any = null;
 const mailListenerManager = new MailListenerManager();
 const eventManager = new EventManager();
 const slackClientManager = new SlackClientManager();
@@ -170,7 +170,7 @@ const main = async () => {
     const workspaceSlackIntegrations = await getAllUserWorkspaces(server, {
       integration_name: "slack",
     });
-    mailListenerManager.init(workspaceEmailIntegrations);
+    // mailListenerManager.init(workspaceEmailIntegrations);
     const mappedWorkspaceSlackIntegrations: ClientConfig[] =
       workspaceSlackIntegrations.map((workspaceSlackIntegration) => {
         return {
@@ -196,4 +196,11 @@ const main = async () => {
 };
 main();
 
-export { logger, slack, mailListenerManager, eventManager, redisClient, slackClientManager };
+export {
+  logger,
+  slack,
+  mailListenerManager,
+  eventManager,
+  redisClient,
+  slackClientManager,
+};

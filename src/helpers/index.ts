@@ -3,6 +3,8 @@ const crypto = require("crypto");
 const algorithm = "aes-256-cbc";
 const secretKey = "jXn2r5u8QfTjWnZr+MbQeThWD(G+KbPU";
 const iv = crypto.randomBytes(16);
+import axios from "axios";
+const { parseString } = require("xml2js");
 
 export const getValidEmails = (str: string | undefined) => {
   if (!str) return [];
@@ -149,3 +151,62 @@ export const isUsernameOrRealName = (value: string) => {
 //   const type = await FileType.fromBuffer(buffer);
 //   return type ? type.mime : "unknown";
 // };
+
+export const addHttpsToUrl = (url: string) => {
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    return `https://${url}`;
+  }
+  return url;
+};
+
+export const addSitemapToUrl = (url: string) => {
+  if (!url.endsWith("")) {
+    return `https://${url}`;
+  }
+  return url;
+};
+
+export const getWebsiteUrlsFromSitemap = async (url: string) => {
+  try {
+    let sitemapUrl = addSitemapToUrl(url);
+    const response = await axios.get(sitemapUrl);
+    const xmlData = response.data;
+
+    const parsedData: any = await parseStringPromise(xmlData);
+    const urls = parsedData.urlset.url.map((url: any) => url?.loc[0]);
+
+    return urls;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const addSitemapPathToBaseUrl = async (
+  baseUrl: string,
+  sitemapPath: string = "sitemap.xml"
+) => {
+  const url: URL = new URL(baseUrl);
+  let base: string = `${url.protocol}//${url.hostname}`;
+
+  if (url.port) {
+    base += `:${url.port}`;
+  }
+
+  if (!base.endsWith("/")) {
+    base += "/";
+  }
+
+  return `${base}${sitemapPath}`;
+};
+
+const parseStringPromise = (xmlData: string) => {
+  return new Promise((resolve, reject) => {
+    parseString(xmlData, (error: any, result: any) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve(result);
+    });
+  });
+};
