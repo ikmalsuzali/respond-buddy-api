@@ -46,10 +46,12 @@ class SlackClientManager {
         this.clients[config.workspace_integration_id]?.app.message(
           async ({ message }) => {
             if (message.text && message.text.includes(`@RespondBuddy`)) {
+              const regex = /@(\w+)/g;
+              const cleanedMessage = message.text.replace(regex, "");
               eventManager.emit("workflow", {
                 type: "slack",
                 workspace_integration_id: config.workspace_integration_id,
-                message: message.text,
+                message: cleanedMessage,
                 metaData: message,
               });
             }
