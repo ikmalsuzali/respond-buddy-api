@@ -5,6 +5,7 @@ import { workspaceRoutes } from "./controllers/workspaces";
 import { authRoutes } from "./controllers/auth";
 import { integrationRoutes } from "./controllers/integrations";
 import { slackRoutes } from "./controllers/slack";
+import { storeRoutes } from "./controllers/store";
 
 export function registerRoutes(fastify: FastifyInstance) {
   stripeRoutes(fastify);
@@ -13,4 +14,5 @@ export function registerRoutes(fastify: FastifyInstance) {
   authRoutes(fastify);
   integrationRoutes(fastify);
   slackRoutes(fastify);
+  storeRoutes(fastify);
 }

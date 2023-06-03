@@ -1,22 +1,29 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { eventManager } from "../main";
+import { eventManager, slackClientManager } from "../main";
+import { MemoryVectorStore } from "langchain/vectorstores/memory";
 import { triggerWorkflow } from "../app/workflow/service";
 import { getCustomer, saveCustomer } from "../app/customer/service";
 import { getWorkspaceTags } from "../app/tags/service";
 import { getWorkspaceIntegration } from "../app/workspaceIntegration/service";
 import { tagSearch } from "../app/gpt/service";
+import { OpenAI } from "langchain/llms/openai";
+import { RetrievalQAChain } from "langchain/chains";
+import { getStoreByWorkspaceId } from "../app/store/service";
+import { getDocsFromRedis } from "../app/redis/service";
+import { OpenAIEmbeddings } from "langchain/embeddings/openai";
+import { Document } from "langchain/document";
 
 export function messageEvents(fastify: FastifyInstance) {
   eventManager.on("workflow", async (data: any) => {
     // Get/Save customer information
-    const customer = await getCustomer(
-      data.workspace_integration_id,
-      data.data
-    );
-    if (!customer) {
-      // Save customer
-      await saveCustomer(data.data, data.workspace_integration_id);
-    }
+    // const customer = await getCustomer({
+    //   workspaceIntegrationId: data.workspace_integration_id,
+    //   userIdentity: data.user_identity,
+    // });
+    // if (!customer) {
+    //   // Save customer
+    //   await saveCustomer(data.data, data.workspace_integration_id);
+    // }
     // Save customer message
 
     // thoughts
@@ -29,11 +36,69 @@ export function messageEvents(fastify: FastifyInstance) {
     const workspaceIntegration = await getWorkspaceIntegration(
       data.workspace_integration_id
     );
+
+    console.log(
+      "🚀 ~ file: message.ts:32 ~ eventManager.on ~ workspaceIntegration:",
+      workspaceIntegration?.workspace
+    );
     const allWorkspaceAndSystemTags = await getWorkspaceTags(
-      workspaceIntegration?.id
+      // @ts-ignore
+      workspaceIntegration?.workspace
+    );
+    console.log(
+      "🚀 ~ file: message.ts:39 ~ eventManager.on ~ allWorkspaceAndSystemTags:",
+      allWorkspaceAndSystemTags
     );
     // 2. Categorize the prompt
-    const matchedTags = tagSearch(allWorkspaceAndSystemTags, data.message);
+    const matchedTags = await tagSearch(
+      allWorkspaceAndSystemTags,
+      data.message
+    );
+
+    const stores = await getStoreByWorkspaceId({
+      workspaceId: workspaceIntegration!.workspace!,
+    });
+
+    console.log(stores);
+
+    console.log(matchedTags);
+
+    let foundDocs: Document<Record<string, any>>[] = [];
+
+    for (const store of stores) {
+      const similarDocs = await getDocsFromRedis({
+        workspaceId: workspaceIntegration!.workspace,
+        storeId: store.id,
+        message: data.message,
+      });
+
+      foundDocs = [...foundDocs, ...similarDocs];
+    }
+
+    console.log(foundDocs);
+
+    const vectorStore = await MemoryVectorStore.fromDocuments(
+      foundDocs,
+      new OpenAIEmbeddings()
+    );
+
+    const model = new OpenAI({});
+    const chain = RetrievalQAChain.fromLLM(model, vectorStore.asRetriever());
+
+    const res = await chain.call({
+      query: data.message,
+    });
+
+    console.log(res);
+
+    slackClientManager.sendMessage({
+      workspace_integration_id: data.workspace_integration_id,
+      channel: data?.metaData.channel,
+      message: res.text,
+      thread_ts: data?.metaData.thread_ts,
+      ts: data?.metaData.ts,
+    });
+
     // 3. Get the vector stores related
     // 4. Search for the similarities in the vector stores
 
@@ -45,8 +110,6 @@ export function messageEvents(fastify: FastifyInstance) {
     // 1. Find the username, email, and other details related to the user
     // 2. If user is found, get the messages related to the user
     // 3. If user is not found, create a new user, and create the message
-
-    triggerWorkflow(data);
 
     // Save response message
     // Follow rules to send message

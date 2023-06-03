@@ -11,7 +11,7 @@ import { getWorkspaceTags } from "../tags/service";
 
 export const triggerWorkflow = async (attrs: any) => {
   // Get workspace_integration from prisma based on id
-  let { workspace_integration_id, message, data } = attrs || {};
+  let { workspaceIntegration, message, data } = attrs || {};
 
   const workspaceIntegration = await prisma.workspace_integrations.findUnique({
     where: {
@@ -22,7 +22,7 @@ export const triggerWorkflow = async (attrs: any) => {
     },
   });
 
-  const tags = await getWorkspaceTags(workspaceIntegration);
+  const tags = await getWorkspaceTags(workspaceIntegration?.workspace);
 
   const matchedTags = await tagSearch(tags, message);
   console.log(matchedTags);

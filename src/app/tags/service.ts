@@ -1,41 +1,40 @@
 // @ts-nocheck
 import { prisma } from "../../prisma";
 
-export const getWorkspaceTags = async (workspaceId: any) => {
+export const getWorkspaceTags = async ({
+  workspaceId,
+}: {
+  workspaceId: string;
+}) => {
+  console.log(
+    "🚀 ~ file: service.ts:5 ~ getWorkspaceTags ~ workspaceId:",
+    workspaceId
+  );
   const tags = await prisma.tags.findMany({
-    where: {
-      OR: [
-        {
-          workspace: workspaceId,
-        },
-        {
-          is_system_tag: true,
-        },
-      ],
-    },
-  });
-
-  // Call prisma to get all unique tags by name where is_system_tag == true and workspace == workspace_id but prefer workspace_id
-  let workspaceTags = await prisma.tags.findMany({
     where: {
       workspace: workspaceId,
     },
   });
 
-  let workspaceTagNames = workspaceTags.map((tag: any) => tag.name);
+  // Call prisma to get all unique tags by name where is_system_tag == true and workspace == workspace_id but prefer workspace_id
+  // let workspaceTags = await prisma.tags.findMany({
+  //   where: {
+  //     workspace: workspaceId,
+  //   },
+  // });
 
-  let systemTags = await prisma.tags.findMany({
-    where: {
-      name: {
-        notIn: workspaceTagNames,
-      },
-      is_system_tag: true,
-    },
-  });
+  // let workspaceTagNames = workspaceTags.map((tag: any) => tag.name);
 
-  let allTags = [...tags, ...systemTags];
+  // let systemTags = await prisma.tags.findMany({
+  //   where: {
+  //     name: {
+  //       notIn: workspaceTagNames,
+  //     },
+  //     is_system_tag: true,
+  //   },
+  // });
 
-  return allTags || [];
+  return tags;
 };
 
 export const getOrCreateTag = async ({

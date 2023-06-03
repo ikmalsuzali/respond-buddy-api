@@ -15,6 +15,7 @@ import EventManager from "./app/event/eventManager";
 import { decryptJwt } from "./helpers";
 import { getAllUserWorkspaces } from "./app/userWorkspaces/service";
 import { triggerWorkflow } from "./app/workflow/service";
+import { createClient, createCluster } from "redis";
 import { registerEvents } from "./events";
 import Redis from "ioredis";
 import SlackClientManager, {
@@ -84,24 +85,11 @@ const main = async () => {
     slack = SlackNotify(process.env.SLACK_WEBHOOK_URL);
   }
 
-  redisClient = new Redis({
-    host: "178.128.30.115", // Replace with your Redis host
-    port: 6379, // Replace with your Redis port
+  redisClient = createClient({
+    url: "redis://178.128.30.115:6379",
   });
 
-  if (redisClient.status === "connecting" || redisClient.status === "ready") {
-    console.log("Redis is already connecting/connected");
-  } else {
-    await redisClient.connect();
-  }
-
-  redisClient.on("connect", () => {
-    console.log("Connected to Redis");
-  });
-
-  redisClient.on("error", (error) => {
-    console.error("Redis error:", error);
-  });
+  await redisClient.connect();
 
   const envToLogger = {
     transport: {
@@ -198,11 +186,6 @@ const main = async () => {
         };
       });
 
-    console.log(
-      "🚀 ~ file: main.ts:212 ~ main ~ mappedWorkspaceSlackIntegrations:",
-      mappedWorkspaceSlackIntegrations
-    );
-
     await slackClientManager.init(mappedWorkspaceSlackIntegrations);
   } catch (err) {
     await prisma.$disconnect();
@@ -213,4 +196,4 @@ const main = async () => {
 };
 main();
 
-export { logger, slack, mailListenerManager, eventManager, redisClient };
+export { logger, slack, mailListenerManager, eventManager, redisClient, slackClientManager };

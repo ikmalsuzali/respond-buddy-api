@@ -26,55 +26,72 @@ class SlackClientManager {
     this.clients = {};
   }
 
-  async init(clientsConfig: ClientConfig[]) {
+  async init(clientConfigs: ClientConfig[]) {
     console.log("Initializing Slack clients...");
 
     try {
-      const config = clientsConfig[0];
+      clientConfigs.forEach(async (config) => {
+        this.clients[config.workspace_integration_id] = {
+          app: new App({
+            token: config.token,
+            signingSecret: config.signing_secret,
+            socketMode: true,
+            appToken: config.app_token,
+            developerMode: true,
+          }),
+          workspace_integration_id: config.workspace_integration_id,
+          team_id: config.teamId,
+        };
 
-      console.log(
-        "🚀 ~ file: SlackClientManager.ts:34 ~ SlackClientManager ~ init ~ config:",
-        config
-      );
+        this.clients[config.workspace_integration_id]?.app.message(
+          async ({ message }) => {
+            console.log(
+              "🚀 ~ !!!file: SlackClientManager.ts:44 ~ SlackClientManager ~ message:",
+              message
+            );
 
-      this.clients[config.workspace_integration_id] = {
-        app: new App({
-          token: config.token,
-          signingSecret: config.signing_secret,
-          socketMode: true,
-          appToken: config.app_token,
-          developerMode: true,
-        }),
-        workspace_integration_id: config.workspace_integration_id,
-        team_id: config.teamId,
-      };
+            if (message.text) {
+              eventManager.emit("workflow", {
+                type: "slack",
+                workspace_integration_id: config.workspace_integration_id,
+                message: message.text,
+                metaData: message,
+              });
+            }
 
-      this.clients[config.workspace_integration_id]?.app.message(
-        async ({ message }) => {
-          console.log(
-            "🚀 ~ !!!file: SlackClientManager.ts:44 ~ SlackClientManager ~ message:",
-            message
-          );
+            // this.sendMessage({
+            //   workspace_integration_id: config.workspace_integration_id,
+            //   channel: message.channel,
+            //   message: "Hello world!",
+            //   thread_ts: message.thread_ts,
+            //   ts: message.ts,
+            // });
+          }
+        );
 
-          this.sendMessage({
-            workspace_integration_id: config.workspace_integration_id,
-            channel: message.channel,
-            message: "Hello world!",
-            thread_ts: message.thread_ts,
-            ts: message.ts,
-          });
-
-          console.log(
-            "🚀 ~ file: SlackClientManager.ts:93 ~ SlackClientManager ~ reply:",
-            reply
-          );
-        }
-      );
-
-      await this.clients[config.workspace_integration_id]?.app.start();
+        await this.clients[config.workspace_integration_id]?.app.start();
+      });
     } catch (error) {
       console.log(error);
     }
+  }
+
+  async addClient(clientConfig: ClientConfig) {
+    if (this.clients[clientConfig.workspace_integration_id]) {
+      return;
+    }
+
+    this.clients[config.workspace_integration_id] = {
+      app: new App({
+        token: config.token,
+        signingSecret: config.signing_secret,
+        socketMode: true,
+        appToken: config.app_token,
+        developerMode: true,
+      }),
+      workspace_integration_id: config.workspace_integration_id,
+      team_id: config.teamId,
+    };
   }
 
   async sendMessage({
@@ -98,7 +115,6 @@ class SlackClientManager {
       text: message,
     });
   }
-
 }
 
 export default SlackClientManager;

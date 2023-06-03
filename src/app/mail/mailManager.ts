@@ -109,6 +109,7 @@ class MailListenerManager extends EventEmitter {
 
                 if (client && parsedBody?.text) {
                   eventManager.emit("workflow", {
+                    type: "email",
                     workspace_integration_id: workspace_integration_id,
                     message: parsedBody.text,
                     data: emailData,

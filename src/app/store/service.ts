@@ -3,11 +3,10 @@ import axios from "axios";
 import * as cheerio from "cheerio";
 import premiumWebsiteUrl from "../../json/websiteUrl.js";
 import { PDFLoader } from "langchain/document_loaders/fs/pdf";
-import { DocxLoader } from "langchain/document_loaders/fs/docx";
-import { prisma } from "../../prisma.js";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
-import { storeFromDocs, storeFromText } from "../weaviate/service.js";
-import { getOrCreateTag } from "../tags/service.js";
+import { getOrCreateTag } from "../tags/service.ts";
+import { storeDocsToRedis } from "../redis/service.ts";
+import { prisma } from "../../prisma";
 
 // What is a store
 // A store is a collection of vectors that are related to each other.
@@ -25,30 +24,38 @@ import { getOrCreateTag } from "../tags/service.js";
 // 5. original_file_name, converted_file_name, workspaceId, s3_file_path_original, s3_file_path_text
 // 3. Save all the tags related to the store
 
-export const saveStore = async (fastify: any, attrs: any) => {
-  const { output_text, workspace_id, type, tags } = attrs;
+export const saveStore = async (attrs: any) => {
+  const { output_text, workspace_id, type, tags, url } = attrs;
+  let docs = null;
 
-  const textSplitter = new RecursiveCharacterTextSplitter({ chunkSize: 1000 });
-  const docs = await textSplitter.createDocuments([output_text]);
+  if (type === "raw") {
+    const textSplitter = new RecursiveCharacterTextSplitter({
+      chunkSize: 1000,
+      chunkOverlap: 100,
+    });
+    docs = await textSplitter.createDocuments([output_text]);
+    console.log("🚀 ~ file: service.ts:36 ~ saveStore ~ docs:", docs);
+  }
 
-  //   await storeFromText()
-
-  storeFromDocs(docs);
-
-  const { store, error } = await prisma.store.create({
+  const store = await prisma.store.create({
     data: {
       output_text,
       type,
       workspace: workspace_id,
     },
   });
+  console.log("🚀 ~ file: service.ts:46 ~ saveStore ~ store:", store);
 
-  if (error) {
-    throw error;
-  }
+  storeDocsToRedis({
+    docs,
+    workspaceId: workspace_id,
+    storeId: store.id,
+    tags,
+  });
 
   const storeTags = [];
 
+  if (!tags) return { store, storeTags: [] };
   for (const tag of tags) {
     const { createdTag, error } = await getOrCreateTag({
       name: tag.name,
@@ -97,6 +104,20 @@ export const getTextByWebsiteURL = async (url: string) => {
   } catch (error) {
     throw error;
   }
+};
+
+export const getStoreByWorkspaceId = async ({
+  workspaceId,
+}: {
+  workspaceId: string | null;
+}) => {
+  const stores = await prisma.store.findMany({
+    where: {
+      workspace: workspaceId,
+    },
+  });
+
+  return stores;
 };
 
 export const getUploadedDocs = async (url: string) => {

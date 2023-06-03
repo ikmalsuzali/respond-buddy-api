@@ -16,9 +16,11 @@ export const tagSearch = async (tags: any, message: string) => {
     "🚀 ~ file: service.ts:15 ~ filteredTag ~ filteredTag:",
     filteredTag
   );
+
+  return filteredTag
   // Get filteredTag
   // Get stores based on the filteredTag
-  // Get
+  // Get 
 };
 
 // thoughts
@@ -39,6 +41,9 @@ export const tagSearch = async (tags: any, message: string) => {
 // 1. Find the username, email, and other details related to the user
 // 2. If user is found, get the messages related to the user
 // 3. If user is not found, create a new user, and create the message
+
+
+
 
 const categorizePrompt = async (tags: any, message: string) => {
   const parser = StructuredOutputParser.fromNamesAndDescriptions({

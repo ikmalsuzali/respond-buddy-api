@@ -3,10 +3,13 @@ import { prisma } from "../../prisma";
 
 // get customer information from prisma where customer_id == customerId and workspace_id == workspaceId and integration_type = integrationType and userIdentity matches to the string field  email or user_aliases values
 
-export const getCustomer = async (
-  workspaceIntegrationId: string,
-  userIdentity: string
-) => {
+export const getCustomer = async ({
+  workspaceIntegrationId,
+  userIdentity,
+}: {
+  workspaceIntegrationId: string;
+  userIdentity: string;
+}) => {
   const customer = await prisma.customers.findFirst({
     where: {
       workspace_integration: workspaceIntegrationId,
