@@ -14,14 +14,12 @@ import MailListenerManager from "./app/mail/mailManager";
 import EventManager from "./app/event/eventManager";
 import { decryptJwt } from "./helpers";
 import { getAllUserWorkspaces } from "./app/userWorkspaces/service";
-import { triggerWorkflow } from "./app/workflow/service";
-import { createClient, createCluster } from "redis";
+import { createClient } from "redis";
 import { registerEvents } from "./events";
-import Redis from "ioredis";
 import SlackClientManager, {
   ClientConfig,
 } from "./app/slack/SlackClientManager";
-const { App } = require("@slack/bolt");
+import { S3 } from "@aws-sdk/client-s3";
 
 let slack = null;
 let logger = null;
@@ -29,6 +27,7 @@ let redisClient: any = null;
 const mailListenerManager = new MailListenerManager();
 const eventManager = new EventManager();
 const slackClientManager = new SlackClientManager();
+let s3: any = null;
 const main = async () => {
   const schema = {
     type: "object",
@@ -77,8 +76,33 @@ const main = async () => {
       OPENAI_API_KEY: {
         type: "string",
       },
+      S3_ACCESS_KEY: {
+        type: "string",
+        default: "",
+      },
+      S3_SECRET_KEY: {
+        type: "string",
+        default: "",
+      },
+      S3_ENDPOINT: {
+        type: "string",
+        default: "",
+      },
     },
   };
+
+  // @ts-ignore
+  s3 = new S3({
+    forcePathStyle: false,
+    endpoint: process.env.S3_ENDPOINT,
+    region: "us-east-1",
+    credentials: {
+      // @ts-ignore
+      accessKeyId: process.env.S3_ACCESS_KEY,
+      // @ts-ignore
+      secretAccessKey: process.env.S3_SECRET_KEY,
+    },
+  });
 
   if (process.env.Env == "production") {
     // @ts-ignore
@@ -140,7 +164,12 @@ const main = async () => {
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization", "Accept"],
   });
-  server.register(require("@fastify/multipart"));
+  server.register(require("@fastify/multipart"), {
+    attachFieldsToBody: true,
+    limits: {
+      fileSize: 1024 * 1024 * 2, // 5MB limit per file
+    },
+  });
   server.register(require("@fastify/formbody"));
   server.register(axiosClient, {
     name: "axios",
@@ -188,6 +217,7 @@ const main = async () => {
 
     await slackClientManager.init(mappedWorkspaceSlackIntegrations);
   } catch (err) {
+    console.log(err);
     await prisma.$disconnect();
     process.exit(1);
   }
@@ -203,4 +233,5 @@ export {
   eventManager,
   redisClient,
   slackClientManager,
+  s3,
 };
