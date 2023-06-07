@@ -34,31 +34,6 @@ export function storeRoutes(fastify: FastifyInstance) {
       docs = await splitter.createDocuments([outputText]);
     }
 
-    if (url && (type === "csv" || type === "pdf")) {
-      // https://api.unstructured.io/general/v0/general
-
-      let tmpFilePath = await convertS3UrlToTempFile(
-        "https://respondbuddy.sfo3.cdn.digitaloceanspaces.com/26a0f8a7-2a39-42ad-9f85-cacf1354dc2b_1685890244084.xlsx"
-      );
-
-      console.log("tmpfilepath", tmpFilePath);
-      const loader = new UnstructuredLoader(tmpFilePath, {
-        apiUrl: "https://api.unstructured.io/general/v0/general",
-      });
-
-      console.log("loader", loader);
-
-      const loadedDocs = await loader.load();
-      console.log("🚀 ~ file: store.ts:52 ~ fastify.post ~ docs:", docs);
-
-      const splitter = new RecursiveCharacterTextSplitter({
-        chunkSize: 2000,
-        chunkOverlap: 200,
-      });
-
-      docs = await splitter.splitDocuments(loadedDocs);
-    }
-
     // Get S3 Buffer file
     // store in outputText
 

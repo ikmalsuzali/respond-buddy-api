@@ -82,12 +82,31 @@ export const convertS3UrlToFile = async (s3Url: string) => {
 
 export const convertS3UrlToTempFile = async (s3Url: string) => {
   try {
+    const extension = await getExtensionFromS3File(s3Url);
     const response = await axios.get(s3Url, { responseType: "arraybuffer" });
-    const tempFilePath = path.join(os.tmpdir(), `s3file_${Date.now()}.xlsx`);
+    const tempFilePath = path.join(
+      os.tmpdir(),
+      `s3file_${Date.now()}.${extension}}`
+    );
     fs.writeFileSync(tempFilePath, response.data);
     return tempFilePath;
   } catch (error) {
     console.error("Error converting S3 URL to temp file:", error);
     throw error;
   }
+};
+
+export const getExtensionFromS3File = async (fileKey: string) => {
+  // Split the file key by '.' to separate the file name and extension
+  const parts = fileKey.split(".");
+
+  // If there are no parts or only one part, there is no extension
+  if (parts.length <= 1) {
+    return "";
+  }
+
+  // The extension is the last part of the split
+  const extension = parts[parts.length - 1];
+
+  return extension;
 };
