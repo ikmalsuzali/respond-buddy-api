@@ -25,14 +25,17 @@ export const unstructuredLoader = async (tempFile: string) => {
 };
 
 export const htmlLoader = async (tempFile: string) => {
-  const outputText = await fs.readFile(tempFile, "utf8");
+  // @ts-ignore
+  const outputText: string = await fs.readFile(tempFile, "utf8");
 
   const splitter = RecursiveCharacterTextSplitter.fromLanguage("html", {
     chunkSize: 1000,
     chunkOverlap: 200,
   });
 
-  docs = await splitter.createDocuments([outputText]);
+  const docs = await splitter.createDocuments([outputText]);
+
+  return docs;
 };
 
 export const convertExcelToCSV = async (tempFile: string) => {
