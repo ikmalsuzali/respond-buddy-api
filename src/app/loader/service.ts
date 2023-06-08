@@ -2,31 +2,27 @@ import { CSVLoader } from "langchain/document_loaders/fs/csv";
 import { DocxLoader } from "langchain/document_loaders/fs/docx";
 import { convertS3UrlToTempFile } from "../s3/service";
 import { PDFLoader } from "langchain/document_loaders/fs/pdf";
+import fsPromise from "fs/promises";
 import fs from "fs";
 import XLSX from "xlsx";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { UnstructuredLoader } from "langchain/document_loaders/fs/unstructured";
-import { getTextByWebsiteURL } from "../store/service";
 
-export const unstructuredLoader = async (tempFile: string) => {
-  const loader = new UnstructuredLoader(tempFile, {
-    apiUrl: "https://api.unstructured.io/general/v0/general",
+export const textLoader = async (tempFile: string) => {
+  const outputText: string = await fsPromise.readFile(tempFile, "utf8");
+
+  const textSplitter = new RecursiveCharacterTextSplitter({
+    chunkSize: 200,
+    chunkOverlap: 10,
   });
+  const docs = await textSplitter.createDocuments([outputText]);
 
-  const docs = await loader.load();
-
-  const splitter = new RecursiveCharacterTextSplitter({
-    chunkSize: 2000,
-    chunkOverlap: 200,
-  });
-
-  const splittedDocs = await splitter.splitDocuments(docs);
-  return splittedDocs;
+  return docs;
 };
 
 export const htmlLoader = async (tempFile: string) => {
   // @ts-ignore
-  const outputText: string = await fs.readFile(tempFile, "utf8");
+  const outputText: string = await fsPromise.readFile(tempFile, "utf8");
 
   const splitter = RecursiveCharacterTextSplitter.fromLanguage("html", {
     chunkSize: 1000,
@@ -46,7 +42,8 @@ export const convertExcelToCSV = async (tempFile: string) => {
   const writeStream = fs.createWriteStream(tempFile);
   writeStream.write(csv, "utf8");
   writeStream.end();
-  return tempFile;
+  const docs = csvLoader(tempFile);
+  return docs;
 };
 
 export const csvLoader = async (tempFile: string | null) => {
@@ -77,7 +74,9 @@ export const loadS3File = async (s3Url: string) => {
     throw new Error("File does not exist");
   }
 
-  if (s3Url.includes(".csv")) {
+  if (s3Url.includes(".txt")) {
+    textLoader(tempFile);
+  } else if (s3Url.includes(".csv")) {
     csvLoader(tempFile);
   } else if (s3Url.includes(".pdf")) {
     pdfLoader(tempFile);
@@ -90,4 +89,20 @@ export const loadS3File = async (s3Url: string) => {
   }
 
   return newTempFile;
+};
+
+export const unstructuredLoader = async (tempFile: string) => {
+  const loader = new UnstructuredLoader(tempFile, {
+    apiUrl: "https://api.unstructured.io/general/v0/general",
+  });
+
+  const docs = await loader.load();
+
+  const splitter = new RecursiveCharacterTextSplitter({
+    chunkSize: 2000,
+    chunkOverlap: 200,
+  });
+
+  const splittedDocs = await splitter.splitDocuments(docs);
+  return splittedDocs;
 };

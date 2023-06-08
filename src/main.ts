@@ -8,7 +8,6 @@ import fastifyEnv from "@fastify/env";
 import fastifySensible from "@fastify/sensible";
 // @ts-ignore
 import axiosClient from "fastify-axios";
-import SlackNotify from "slack-notify";
 const { fastifySchedulePlugin } = require("@fastify/schedule");
 import MailListenerManager from "./app/mail/mailManager";
 import EventManager from "./app/event/eventManager";
@@ -103,11 +102,6 @@ const main = async () => {
       secretAccessKey: process.env.S3_SECRET_KEY,
     },
   });
-
-  if (process.env.Env == "production") {
-    // @ts-ignore
-    slack = SlackNotify(process.env.SLACK_WEBHOOK_URL);
-  }
 
   redisClient = createClient({
     url: "redis://178.128.30.115:6379",

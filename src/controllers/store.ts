@@ -1,9 +1,8 @@
 // @ts-nocheck
-import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { FastifyInstance } from "fastify";
 import { getTextByWebsiteURL, saveStore } from "../app/store/service";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
-import { UnstructuredLoader } from "langchain/document_loaders/fs/unstructured";
-import { convertS3UrlToFile, convertS3UrlToTempFile } from "../app/s3/service";
+import { eventManager } from "../main";
 
 export function storeRoutes(fastify: FastifyInstance) {
   fastify.post("/api/v1/store", async (request, reply) => {
@@ -11,6 +10,12 @@ export function storeRoutes(fastify: FastifyInstance) {
 
     let outputText = text;
     let docs = [];
+
+    eventManager.emit("store-s3");
+    // Event emitter (store-s3)
+    // Store upload file
+    // Check if there is s3 file if not file we upload
+    // Save into redis
 
     if (type === "raw" && text) {
       outputText = text;

@@ -3,7 +3,6 @@ import axios from "axios";
 import * as cheerio from "cheerio";
 import premiumWebsiteUrl from "../../json/websiteUrl.js";
 import { PDFLoader } from "langchain/document_loaders/fs/pdf";
-import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { getOrCreateTag } from "../tags/service.ts";
 import { storeDocsToRedis } from "../redis/service.ts";
 import { prisma } from "../../prisma";
@@ -25,11 +24,12 @@ import { prisma } from "../../prisma";
 // 3. Save all the tags related to the store
 
 export const saveStore = async (attrs: any) => {
-  const { workspaceId, type, tags, url, docs } = attrs;
+  const { workspaceId, type, tags, url, docs, outputText } = attrs;
 
   const store = await prisma.store.create({
     data: {
       type,
+      output_text: outputText,
       workspace: workspaceId,
     },
   });

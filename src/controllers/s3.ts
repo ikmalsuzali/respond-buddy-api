@@ -21,6 +21,12 @@ export function s3Routes(fastify: FastifyInstance) {
         key: uploadResult?.key,
       });
 
+      // Case 1:
+      // Upload the file
+      // Run the loaders based on file type
+      // Save the doc from loaders to s3 also based on filename.gpt
+      // Save the file in redis
+
       const fileUrl = uploadResult?.data.location;
 
       reply.code(200).send({ urls: fileUrl });
@@ -44,6 +50,5 @@ export function s3Routes(fastify: FastifyInstance) {
 export function s3Events() {
   eventManager.on("file-uploaded", async (data) => {
     console.log("🚀 ~ file: s3.ts:95 ~ eventManager.on ~ data", data);
-    
   });
 }
