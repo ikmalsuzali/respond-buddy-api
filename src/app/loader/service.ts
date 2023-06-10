@@ -34,15 +34,16 @@ export const htmlLoader = async (tempFile: string) => {
   return docs;
 };
 
-export const convertExcelToCSV = async (tempFile: string) => {
+export const excelLoader = async (tempFile: string) => {
   const workbook = XLSX.readFile(tempFile);
   const worksheet = workbook.Sheets[workbook.SheetNames[0]];
   const csv = XLSX.utils.sheet_to_csv(worksheet);
+  console.log("🚀 ~ file: service.ts:41 ~ excelLoader ~ csv:", csv);
 
   const writeStream = fs.createWriteStream(tempFile);
   writeStream.write(csv, "utf8");
   writeStream.end();
-  const docs = csvLoader(tempFile);
+  const docs = await csvLoader(tempFile);
   return docs;
 };
 
@@ -66,6 +67,7 @@ export const docLoader = async (tempFile: string | null) => {
 
 export const loadS3File = async (s3Url: string) => {
   const tempFile = await convertS3UrlToTempFile(s3Url!);
+  console.log("🚀 ~ file: service.ts:69 ~ loadS3File ~ tempFile:", tempFile);
 
   if (!tempFile) throw new Error("File does not exist");
 
@@ -74,15 +76,15 @@ export const loadS3File = async (s3Url: string) => {
   }
 
   if (s3Url.includes(".txt")) {
-    return textLoader(tempFile);
+    return await textLoader(tempFile);
   } else if (s3Url.includes(".csv")) {
-    return csvLoader(tempFile);
+    return await csvLoader(tempFile);
   } else if (s3Url.includes(".pdf")) {
     return pdfLoader(tempFile);
   } else if (s3Url.includes(".docx")) {
-    return docLoader(tempFile);
+    return await docLoader(tempFile);
   } else if (s3Url.includes(".xlsx") || s3Url.includes(".xls")) {
-    return convertExcelToCSV(tempFile);
+    return await excelLoader(tempFile);
   } else {
     throw new Error("File type not supported");
   }

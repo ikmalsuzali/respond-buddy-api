@@ -14,6 +14,10 @@ export function s3Routes(fastify: FastifyInstance) {
         file: file,
         workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
       });
+      console.log(
+        "🚀 ~ file: s3.ts:17 ~ fastify.post ~ uploadResult:",
+        uploadResult
+      );
 
       // Case 1:
       // Upload the file
@@ -23,7 +27,11 @@ export function s3Routes(fastify: FastifyInstance) {
 
       const fileUrl = uploadResult?.data.location;
 
-      reply.code(200).send({ urls: fileUrl });
+      reply.code(200).send({
+        url:
+          "https://respondbuddy.sfo3.cdn.digitaloceanspaces.com/" +
+          uploadResult?.newKey,
+      });
     } catch (error) {
       console.error("Error uploading file:", error);
       reply.code(500).send("Error uploading file");

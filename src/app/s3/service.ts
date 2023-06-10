@@ -39,6 +39,7 @@ export const storeS3File = async ({
         Bucket: "respondbuddy",
         Key: newKey,
         Body: fileBuffer,
+        ACL: "public-read",
       };
       console.log("🚀 ~ file: service.ts:36 ~ uploadParams:", uploadParams);
 

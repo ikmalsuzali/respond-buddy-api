@@ -93,8 +93,8 @@ const main = async () => {
       },
       DISCORD_TOKEN: {
         type: "string",
-        default: ""
-      }
+        default: "",
+      },
     },
   };
 

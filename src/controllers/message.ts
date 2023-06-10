@@ -59,14 +59,18 @@ export function messageEvents(fastify: FastifyInstance) {
 
     let foundDocs: Document<Record<string, any>>[] = [];
 
-    for (const store of stores) {
-      const similarDocs = await getDocsFromRedis({
-        workspaceId: workspaceIntegration!.workspace,
-        storeId: store.id,
-        message: data.message,
-      });
+    try {
+      for (const store of stores) {
+        const similarDocs = await getDocsFromRedis({
+          workspaceId: workspaceIntegration!.workspace,
+          storeId: store.id,
+          message: data.message,
+        });
 
-      foundDocs = [...foundDocs, ...similarDocs];
+        foundDocs = [...foundDocs, ...similarDocs];
+      }
+    } catch (error) {
+      console.log(error);
     }
 
     console.log(

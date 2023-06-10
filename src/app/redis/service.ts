@@ -42,7 +42,7 @@ export const getDocsFromRedis = async ({
   workspaceId,
   storeId,
   message,
-  similarityCount = 1,
+  similarityCount = 5,
 }: {
   workspaceId: string | null;
   storeId: string | null;
@@ -54,6 +54,8 @@ export const getDocsFromRedis = async ({
       redisClient: redisClient,
       indexName: `${workspaceId}:${storeId}`,
     });
+
+    console.log(message);
 
     const docs = await vectorStore.similaritySearch(message, similarityCount);
 

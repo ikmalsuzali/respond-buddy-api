@@ -24,7 +24,7 @@ import { prisma } from "../../prisma";
 // 3. Save all the tags related to the store
 
 export const saveStore = async (attrs: any) => {
-  const { workspaceId, type, tags, url, docs, outputText } = attrs;
+  const { workspaceId, type, tags, urls, docs, outputText } = attrs;
 
   const store = await prisma.store.create({
     data: {
@@ -121,7 +121,7 @@ export const getTextByWebsiteURL = async (url: string) => {
   `;
 
     // Print the extracted text
-    console.log(remappedHTML);
+    console.log("remappedHTMl", remappedHTML);
     return remappedHTML;
   } catch (error) {
     console.log(
