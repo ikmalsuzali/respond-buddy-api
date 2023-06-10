@@ -80,7 +80,7 @@ export const loadS3File = async (s3Url: string) => {
   } else if (s3Url.includes(".csv")) {
     return await csvLoader(tempFile);
   } else if (s3Url.includes(".pdf")) {
-    return pdfLoader(tempFile);
+    return await pdfLoader(tempFile);
   } else if (s3Url.includes(".docx")) {
     return await docLoader(tempFile);
   } else if (s3Url.includes(".xlsx") || s3Url.includes(".xls")) {

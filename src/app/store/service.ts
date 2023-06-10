@@ -34,7 +34,9 @@ export const saveStore = async (attrs: any) => {
     },
   });
 
-  storeDocsToRedis({
+  console.log("🚀 ~ file: service.ts:45 ~ saveStore ~ docs:", docs);
+
+  await storeDocsToRedis({
     docs,
     workspaceId: workspaceId,
     storeId: store.id,
