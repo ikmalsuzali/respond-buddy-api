@@ -87,6 +87,14 @@ const main = async () => {
         type: "string",
         default: "",
       },
+      TELEGRAM_TOKEN: {
+        type: "string",
+        default: "",
+      },
+      DISCORD_TOKEN: {
+        type: "string",
+        default: ""
+      }
     },
   };
 

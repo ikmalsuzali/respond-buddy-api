@@ -3,44 +3,51 @@ import { FastifyInstance } from "fastify";
 import { getTextByWebsiteURL, saveStore } from "../app/store/service";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { eventManager } from "../main";
+import { storeS3File } from "../app/s3/service";
+import fs from "fs";
+import os from "os";
+import { htmlLoader, loadS3File, textLoader } from "../app/loader/service";
 
 export function storeRoutes(fastify: FastifyInstance) {
   fastify.post("/api/v1/store", async (request, reply) => {
-    const { text, url, type, tags, metadata } = request.body || {};
-
+    const { text, urls, type, tags, s3_url, metadata } = request.body || {};
+    const tempFilePath = `${os.tmpdir()}/temp_file.txt`;
     let outputText = text;
     let docs = [];
 
     eventManager.emit("store-s3");
-    // Event emitter (store-s3)
-    // Store upload file
-    // Check if there is s3 file if not file we upload
-    // Save into redis
 
     if (type === "raw" && text) {
-      outputText = text;
-      const textSplitter = new RecursiveCharacterTextSplitter({
-        chunkSize: 200,
-        chunkOverlap: 10,
+      fs.writeFile(tempFilePath, textContent, (err) => {
+        if (err) throw new Error(err);
+        // Store text file
+        await storeS3File({
+          file: tempFilePath,
+          workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
+        });
+
+        docs = textLoader(tempFilePath);
       });
-      docs = await textSplitter.createDocuments([outputText]);
-      console.log("🚀 ~ file: service.ts:36 ~ saveStore ~ docs:", docs);
-    }
-
-    if (type === "website_url" && url) {
-      console.log("🚀 ~ file: store.ts:100 ~ fastify.post ~ url", url);
-      outputText = await getTextByWebsiteURL(url);
-
-      const splitter = RecursiveCharacterTextSplitter.fromLanguage("html", {
-        chunkSize: 1000,
-        chunkOverlap: 200,
+    } else if (type === "website_url" && urls) {
+      let outputTexts = null;
+      urls.forEach(async (url) => {
+        outputTexts += await getTextByWebsiteURL(url);
       });
 
-      docs = await splitter.createDocuments([outputText]);
-    }
+      // Save into s3
+      fs.writeFile(tempFilePath, textContent, (err) => {
+        if (err) throw new Error(err);
+        // Store text file
+        await storeS3File({
+          file: tempFilePath,
+          workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
+        });
 
-    // Get S3 Buffer file
-    // store in outputText
+        docs = htmlLoader(tempFilePath);
+      });
+    } else {
+      docs = loadS3File(s3_url);
+    }
 
     const storeData = await saveStore({
       output_text: outputText,

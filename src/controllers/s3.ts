@@ -15,12 +15,6 @@ export function s3Routes(fastify: FastifyInstance) {
         workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
       });
 
-      eventManager.emit("file-uploaded", {
-        workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
-        file,
-        key: uploadResult?.key,
-      });
-
       // Case 1:
       // Upload the file
       // Run the loaders based on file type

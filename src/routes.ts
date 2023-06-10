@@ -7,6 +7,7 @@ import { integrationRoutes } from "./controllers/integrations";
 import { slackRoutes } from "./controllers/slack";
 import { storeRoutes } from "./controllers/store";
 import { s3Routes } from "./controllers/s3";
+import { discordRoutes } from "./controllers/discord";
 
 export function registerRoutes(fastify: FastifyInstance) {
   stripeRoutes(fastify);
@@ -17,4 +18,5 @@ export function registerRoutes(fastify: FastifyInstance) {
   slackRoutes(fastify);
   storeRoutes(fastify);
   s3Routes(fastify);
+  discordRoutes(fastify);
 }
