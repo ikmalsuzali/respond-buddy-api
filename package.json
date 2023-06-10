@@ -57,6 +57,7 @@
     "cheerio": "^1.0.0-rc.12",
     "crypto": "^1.0.1",
     "d3-dsv": "2",
+    "discord.js": "^14.11.0",
     "dotenv": "^16.0.0",
     "facebook-nodejs-business-sdk": "^15.0.0",
     "fast-json-stringify": "^5.4.0",

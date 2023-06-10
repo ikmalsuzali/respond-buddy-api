@@ -45,8 +45,7 @@ class SlackClientManager {
 
         this.clients[config.workspace_integration_id]?.app.message(
           async ({ message }) => {
-            console.log(message);
-            if (message.text && message.text.includes(`<@U05AMCB0SE4>`)) {
+            if (message?.text.includes(`<@U05AMCB0SE4>`)) {
               const regex = /<@.*?>/g;
               const cleanedMessage = message.text.replace(regex, "");
               eventManager.emit("workflow", {
