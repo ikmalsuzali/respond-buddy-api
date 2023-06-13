@@ -48,12 +48,12 @@ class SlackClientManager {
             if (message?.text.includes(`<@U05AMCB0SE4>`)) {
               const regex = /<@.*?>/g;
               const cleanedMessage = message.text.replace(regex, "");
-              const userInfo = await this.clients[
-                config.workspace_integration_id
-              ].users.info({
-                token: config.token,
-                user: message.user,
-              });
+              // const userInfo = await this.clients[
+              //   config.workspace_integration_id
+              // ].users.info({
+              //   token: config.token,
+              //   user: message.user,
+              // });
 
               // eventManager.emit("save-customer", {
               //   type: "slack",
