@@ -45,7 +45,7 @@ class SlackClientManager {
 
         this.clients[config.workspace_integration_id]?.app.message(
           async ({ message }) => {
-            if (message?.text.includes(`<@U05AMCB0SE4>`)) {
+            if (message?.text?.includes(`<@U05AMCB0SE4>`)) {
               const regex = /<@.*?>/g;
               const cleanedMessage = message.text.replace(regex, "");
               // const userInfo = await this.clients[
@@ -69,7 +69,7 @@ class SlackClientManager {
                 message: cleanedMessage,
                 metaData: message,
               });
-            }
+            }  
           }
         );
 
