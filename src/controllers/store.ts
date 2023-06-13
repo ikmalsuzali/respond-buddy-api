@@ -14,19 +14,35 @@ export function storeRoutes(fastify: FastifyInstance) {
     let outputText = text;
     let docs = [];
 
-    eventManager.emit("store-s3");
+    // Comment first before done working on store S3
+    // eventManager.emit("store-s3");
 
-    if (type === "raw" && text) {
-      fs.writeFile(tempFilePath, textContent, (err) => {
+    const convertRawFileToDocs = async () => {
+      await fs.writeFile(tempFilePath, outputText, async (err) => {
         if (err) throw new Error(err);
-        // Store text file
-        await storeS3File({
-          file: tempFilePath,
-          workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
+    
+        // Read the local file content
+        await fs.readFile(tempFilePath, async (err, data) => {
+          if (err) throw new Error(err);
+    
+          // Store text file
+          await storeS3File({
+            // Hard code filename & toBuffer function below as these information need in store S3 file function
+            file: {
+              filename: tempFilePath,
+              toBuffer: () => data
+            },
+            workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
+          });
         });
-
-        docs = textLoader(tempFilePath);
+    
       });
+    
+      return textLoader(tempFilePath)
+    }
+    
+    if (type === "raw" && text) {
+      docs = await convertRawFileToDocs()
     } else if (type === "website_url" && urls) {
       let outputTexts = null;
       for (let i = 0; i < urls.length; i++) {
@@ -65,7 +81,7 @@ export function storeRoutes(fastify: FastifyInstance) {
     }
 
     const storeData = await saveStore({
-      output_text: outputText,
+      outputText,
       workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
       type,
       docs,
