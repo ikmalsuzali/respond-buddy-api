@@ -1,4 +1,6 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { eventManager } from "../main";
+// import { saveCustomer } from "../app/customer/service";
 
 export function slackRoutes(fastify: FastifyInstance) {
   fastify.post(
@@ -19,4 +21,11 @@ export function slackRoutes(fastify: FastifyInstance) {
   );
 }
 
-export function slackEvents(fastify: FastifyInstance) {}
+export function slackEvents(fastify: FastifyInstance) {
+  // @ts-ignore
+  eventManager.on("save-customer", async (data) => {
+    // saveCustomer(data.email, data.workspace_integration_id);
+  });
+}
+
+// const saveSlackCustomer = async (data) => {};

@@ -1,3 +1,4 @@
+import { type } from "os";
 import { isEmail, isUsernameOrRealName } from "../../helpers";
 import { prisma } from "../../prisma";
 
@@ -28,46 +29,37 @@ export const getCustomer = async ({
   return customer;
 };
 
-export const saveCustomer = async (
-  userIdentity: string,
-  workspaceIntegrationId: string
-) => {
-  // Check if userIdentity is email or user_alias
-  let data = {
-    workspace_integration: workspaceIntegrationId,
-    user_alias: userIdentity,
+// export const saveCustomer = async ({
+//   email,
+//   workspace,
+//   metadata,
+// }: {
+//   email: string;
+//   workspace: string;
+//   metadata?: any | null | undefined;
+// }) => {
+//   // @ts-nocheck
+//   const customer = await prisma.customers.create({
+//     data: {
+//       email,
+//       workspace,
+//       metadata: {
+//         ...metadata,
+//         slack_id: metadata?.user?.id,
+//         slack_username: metadata?.user?.name,
+//       },
+//     },
+//   });
+
+//   if (!customer) throw new Error("Unable to create customer");
+
+//   return customer;
+// };
+
+export const getSlackCustomer = async ({ userInfo }: { userInfo: any }) => {
+  return {
+    email: userInfo?.user?.profile?.email,
+    slack_id: userInfo?.user?.id,
+    slack_username: userInfo?.user?.name,
   };
-  // Check if userIdentity is an email using regex
-  if (isEmail(userIdentity)) {
-    data = {
-      ...data,
-      ...{ email: userIdentity },
-    };
-  } else if (isUsernameOrRealName(userIdentity) === "username") {
-    let userAliasJson = JSON.stringify({
-      username: userIdentity,
-    });
-
-    data = {
-      ...data,
-      ...{ user_alias: userAliasJson },
-    };
-  } else if (isUsernameOrRealName(userIdentity) === "real_name") {
-    let userAliasJson = JSON.stringify({
-      full_name: userIdentity,
-    });
-
-    data = {
-      ...data,
-      ...{ user_alias: userAliasJson },
-    };
-  }
-
-  const customer = await prisma.customers.create({
-    data,
-  });
-
-  if (!customer) throw new Error("Unable to create customer");
-
-  return customer;
 };

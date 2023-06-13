@@ -2,7 +2,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { eventManager, slackClientManager } from "../main";
 import { MemoryVectorStore } from "langchain/vectorstores/memory";
 import { triggerWorkflow } from "../app/workflow/service";
-import { getCustomer, saveCustomer } from "../app/customer/service";
+import { getCustomer } from "../app/customer/service";
 import { getWorkspaceTags } from "../app/tags/service";
 import { getWorkspaceIntegration } from "../app/workspaceIntegration/service";
 import { tagSearch } from "../app/gpt/service";

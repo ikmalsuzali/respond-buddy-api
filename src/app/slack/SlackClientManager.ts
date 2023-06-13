@@ -48,6 +48,21 @@ class SlackClientManager {
             if (message?.text.includes(`<@U05AMCB0SE4>`)) {
               const regex = /<@.*?>/g;
               const cleanedMessage = message.text.replace(regex, "");
+              const userInfo = await this.clients[
+                config.workspace_integration_id
+              ].users.info({
+                token: config.token,
+                user: message.user,
+              });
+
+              // eventManager.emit("save-customer", {
+              //   type: "slack",
+              //   email: userInfo?.user?.profile?.email,
+              //   workspace_integration_id: config.workspace_integration_id,
+              //   metadata: {
+              //     user: userInfo?.user,
+              //   },
+              // });
               eventManager.emit("workflow", {
                 type: "slack",
                 workspace_integration_id: config.workspace_integration_id,
@@ -55,6 +70,19 @@ class SlackClientManager {
                 metaData: message,
               });
             }
+          }
+        );
+
+        this.clients[config.workspace_integration_id]?.app.event(
+          "channel_pinned_item",
+          async ({ event }) => {
+            // Access the pinned message
+            const pinnedMessage = event.item.message;
+
+            // Process the pinned message
+            console.log(`New message pinned: ${pinnedMessage.text}`);
+
+            // Save image
           }
         );
 
@@ -105,5 +133,33 @@ class SlackClientManager {
     });
   }
 }
+
+// const checkContainsThreadMessage = (message: any) => {
+//   const threadLinkRegex = /https:\/\/.*\.slack\.com\/archives\/(\w+)\/p(\d+)/;
+//   const threadLinkMatches = message.text.match(threadLinkRegex);
+
+//   if (threadLinkMatches && threadLinkMatches.length === 3) {
+//     const channel = threadLinkMatches[1];
+//     const timestamp = threadLinkMatches[2];
+
+//     try {
+//       // Fetch the replies in the thread
+//       const result = await app.client.conversations.replies({
+//         token: app.token,
+//         channel,
+//         ts: timestamp,
+//       });
+
+//       // Process the replies
+//       const replies = result.messages;
+//       for (const reply of replies) {
+//         // Perform actions with each reply
+//         console.log(reply.text);
+//       }
+//     } catch (error) {
+//       console.log(error);
+//     }
+//   }
+// };
 
 export default SlackClientManager;
