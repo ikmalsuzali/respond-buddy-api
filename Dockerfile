@@ -9,11 +9,9 @@ RUN apk add --update python3 make g++\
 RUN echo $DATABASE_URL
 
 RUN apk add openssl1.1-compat
-RUN npx prisma generate
 RUN yarn
-RUN yarn postinstall
 RUN yarn install
-RUN yarn build
+RUN yarn start
 
 EXPOSE 8090
 CMD [ "node", "./dist/main.js" ]
