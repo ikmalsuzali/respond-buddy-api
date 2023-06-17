@@ -19,8 +19,6 @@ services:
     build: .
     container_name: api
     restart: always
-    depends_on:
-      - pg
     ports:
       - "8090:8090"
     environment:
@@ -44,9 +42,6 @@ services:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
     networks:
       - internal
-
-volumes:
-  postgres_data:
 
 networks:
   internal:
