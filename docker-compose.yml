@@ -23,10 +23,10 @@ services:
       - pg
     ports:
       - "8090:8090"
-    environment:
-      - DATABASE_URL=postgres://postgres:postgres@pg:5432/postgres
-      - JWT_SECRET=secret
-      - PORT=8090
+    # environment:
+    #   - DATABASE_URL=postgres://postgres:postgres@pg:5432/postgres
+    #   - JWT_SECRET=secret
+    #   - PORT=8090
     networks:
       - internal
 
