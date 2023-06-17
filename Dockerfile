@@ -6,6 +6,9 @@ COPY . .
 RUN apk add --update python3 make g++\
    && rm -rf /var/cache/apk/*
 
+ARG SUPABASE_DATABASE_URL
+ENV SUPABASE_DATABASE_URL=${SUPABASE_DATABASE_URL}
+
 RUN echo ${SUPABASE_DATABASE_URL}
 
 RUN apk add openssl1.1-compat
