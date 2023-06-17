@@ -19,17 +19,13 @@ services:
     build: .
     container_name: api
     restart: unless-stopped
-    build: 
-      context: ./api
-      dockerfile: ./Dockerfile
-      target: development
     command: yarn start
     ports:
       - "8090:8090"
     environment:
       - PORT=8090
       - ENVIRONMENT=${ENVIRONMENT}
-      - DATABASE_URL=${DATABASE_URL}
+      - SUPABASE_DATABASE_URL=${SUPABASE_DATABASE_URL}
       - STRIPE_SECRET_DEMO=${STRIPE_SECRET_DEMO}
       - STRIPE_WEBHOOK_DEMO=${STRIPE_WEBHOOK_DEMO}
       - STRIPE_SECRET_LIVE=${STRIPE_SECRET_LIVE}
@@ -45,7 +41,7 @@ services:
       - S3_SECRET_KEY=${S3_SECRET_KEY}
       - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
       - DISCORD_TOKEN=${DISCORD_TOKEN}
-    volumes: 
+    volumes:
       - ./api:/usr/src/app
       - /usr/src/app/node_modules
 
