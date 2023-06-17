@@ -30,7 +30,7 @@ class TelegramClientManager {
     try {
       clientConfigs.forEach(async (config) => {
         this.clients[config.workspace_integration_id] = {
-          app: new TelegramBot(config.token, {polling: true});
+          app: new TelegramBot(config.token, { polling: true }),
           workspace_integration_id: config.workspace_integration_id,
           token: config.token,
           webhookUrl: config.webhookUrl,
@@ -38,16 +38,15 @@ class TelegramClientManager {
 
         const bot = this.clients[config.workspace_integration_id].app;
         bot.onText(/\/echo (.+)/, (msg: any, match: any) => {
-            // 'msg' is the received Message from Telegram
-            // 'match' is the result of executing the regexp above on the text content
-            // of the message
-          
-            const chatId = msg.chat.id;
-            const resp = match[1]; // the captured "whatever"
-          
-            // send back the matched "whatever" to the chat
-            
-          });
+          // 'msg' is the received Message from Telegram
+          // 'match' is the result of executing the regexp above on the text content
+          // of the message
+
+          const chatId = msg.chat.id;
+          const resp = match[1]; // the captured "whatever"
+
+          // send back the matched "whatever" to the chat
+        });
       });
     } catch (error) {}
   }
@@ -58,12 +57,16 @@ class TelegramClientManager {
     // console.log("Server stopped");
   }
 
-  sendMessage({workspaceIntegrationId, chatId, text}: {
+  sendMessage({
+    workspaceIntegrationId,
+    chatId,
+    text,
+  }: {
     workspaceIntegrationId: string;
     chatId: string;
     text: string;
   }) {
-    const bot = this.clients[workspaceIntegrationId].app
+    const bot = this.clients[workspaceIntegrationId].app;
     bot
       .sendMessage(chatId, text)
       .then(() => console.log(`Sent message to chat ${chatId}: ${text}`))
