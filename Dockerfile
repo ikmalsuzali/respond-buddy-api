@@ -28,7 +28,6 @@ RUN echo $DATABASE_URL
 
 RUN apk add openssl1.1-compat
 RUN yarn
-RUN yarn start
 
 EXPOSE 8090
-CMD [ "node", "./dist/main.js" ]
+CMD [ "yarn", "start" ]
