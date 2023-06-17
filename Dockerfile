@@ -6,7 +6,7 @@ COPY . .
 RUN apk add --update python3 make g++\
    && rm -rf /var/cache/apk/*
 
-RUN echo $DATABASE_URL
+RUN echo ${SUPABASE_DATABASE_URL}
 
 RUN apk add openssl1.1-compat
 RUN yarn
