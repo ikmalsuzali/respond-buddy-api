@@ -23,10 +23,25 @@ services:
       - pg
     ports:
       - "8090:8090"
-    # environment:
-    #   - DATABASE_URL=postgres://postgres:postgres@pg:5432/postgres
-    #   - JWT_SECRET=secret
-    #   - PORT=8090
+    environment:
+      - PORT=8090
+      - ENVIRONMENT=demo
+      - DATABASE_URL=postgresql://postgres:Zaq!@wsxcde3@db.djjapgwabqqfgzolqbwk.supabase.co:5432/postgres?schema=public
+      - STRIPE_SECRET_DEMO=sk_test_51MrtJBGN2oU4a79mU2HpB4ylrPjUtAMNchpqvor5vobtCs1wKFul82nSTIRjURGMEUfhV4hpPttU0uc4UZWc8wPi00fofFYVOL
+      - STRIPE_WEBHOOK_DEMO=whsec_k68Ao4LKN2pSmCu2xaN49FewIMOQoGFV
+      - STRIPE_SECRET_LIVE=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
+      - STRIPE_WEBHOOK_LIVE=whsec_bRNTzeiAT793hua0m9C8OKTI3UFXo6IL
+      - BASE_URL=https://respondbuddy.com
+      - SLACK_WEBHOOK_URL=https://hooks.slack.com/services/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
+      - SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqamFwZ3dhYnFxZmd6b2xxYndrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTY4MzAyNDk4OCwiZXhwIjoxOTk4NjAwOTg4fQ.KdOsTt9gM-tzl7RQ5WXdmkvM-1SaiAAw-uPcVzxk6tQ
+      - SUPABASE_URL=https://djjapgwabqqfgzolqbwk.supabase.co
+      - JWT_SECRET=3Q6MJRglQUgrABgVhj+jy2i7SGia8VOdVtBs0cDhBE3nOaYRefXvnFTY8pWyibFctbLYKvSaPnt4m0Ned/1J2g==
+      - OPENAI_API_KEY=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
+      - S3_ENDPOINT=https://sfo3.digitaloceanspaces.com
+      - S3_ACCESS_KEY=DO00YLX4AHL3X92RVKKQ
+      - S3_SECRET_KEY=FJJJ4rfre/QRK8VFV6ut7lWNJ5jGs+bsoOyoShoDUdk
+      - TELEGRAM_TOKEN=6099091055:AAE8miEMbq99qQpoMn9SOyd3Fgq69beEvYE
+      - DISCORD_TOKEN=MTExNDQ4MDgzMjc2NjI4NzkwMg.GVNW0y.Qze6xizJTQKay3QQS7xC94ni27wHXgEBcDZa-Q
     networks:
       - internal
 
