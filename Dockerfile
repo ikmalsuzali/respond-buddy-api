@@ -7,8 +7,8 @@ RUN apk add --update python3 make g++\
    && rm -rf /var/cache/apk/*
 
 RUN apk add openssl1.1-compat
-RUN yarn
 RUN npx prisma generate
+RUN yarn
 RUN yarn postinstall
 RUN yarn install
 RUN yarn build
