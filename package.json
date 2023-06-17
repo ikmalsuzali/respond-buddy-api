@@ -21,7 +21,7 @@
     "seed": "ts-node src/seed.ts"
   },
   "engines": {
-    "node": "18.12.0",
+    "node": "16.13.0",
     "npm": "8.19.3"
   },
   "devDependencies": {
