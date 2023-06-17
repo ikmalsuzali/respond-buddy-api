@@ -25,7 +25,7 @@ services:
     environment:
       - PORT=8090
       - ENVIRONMENT=${ENVIRONMENT}
-      - SUPABASE_DATABASE_URL=${SUPABASE_DATABASE_URL}
+      - SUPABASE_DATABASE_URL=postgresql://postgres:Zaq!@wsxcde3@db.djjapgwabqqfgzolqbwk.supabase.co:5432/postgres?schema=public
       - STRIPE_SECRET_DEMO=${STRIPE_SECRET_DEMO}
       - STRIPE_WEBHOOK_DEMO=${STRIPE_WEBHOOK_DEMO}
       - STRIPE_SECRET_LIVE=${STRIPE_SECRET_LIVE}
