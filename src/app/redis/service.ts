@@ -25,6 +25,7 @@ export const storeDocsToRedis = async ({
 
   console.log(docsInit);
 
+  if (!docsInit.length) throw new Error("Docs is empty");
   const vectorStore = await RedisVectorStore.fromDocuments(
     docsInit,
     new OpenAIEmbeddings(),

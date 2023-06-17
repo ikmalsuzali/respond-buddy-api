@@ -45,32 +45,32 @@ class SlackClientManager {
 
         this.clients[config.workspace_integration_id]?.app.message(
           async ({ message }) => {
-            if (message?.text?.includes(`<@U05AMCB0SE4>`)) {
-              const regex = /<@.*?>/g;
-              const cleanedMessage = message.text.replace(regex, "");
-              // const userInfo = await this.clients[
-              //   config.workspace_integration_id
-              // ].users.info({
-              //   token: config.token,
-              //   user: message.user,
-              // });
+            // if (message?.text?.includes(`<@U05AMCB0SE4>`)) {
+            const regex = /<@.*?>/g;
+            const cleanedMessage = message.text.replace(regex, "");
+            // const userInfo = await this.clients[
+            //   config.workspace_integration_id
+            // ].users.info({
+            //   token: config.token,
+            //   user: message.user,
+            // });
 
-              // eventManager.emit("save-customer", {
-              //   type: "slack",
-              //   email: userInfo?.user?.profile?.email,
-              //   workspace_integration_id: config.workspace_integration_id,
-              //   metadata: {
-              //     user: userInfo?.user,
-              //   },
-              // });
-              eventManager.emit("workflow", {
-                type: "slack",
-                workspace_integration_id: config.workspace_integration_id,
-                message: cleanedMessage,
-                metaData: message,
-              });
-            }  
+            // eventManager.emit("save-customer", {
+            //   type: "slack",
+            //   email: userInfo?.user?.profile?.email,
+            //   workspace_integration_id: config.workspace_integration_id,
+            //   metadata: {
+            //     user: userInfo?.user,
+            //   },
+            // });
+            eventManager.emit("workflow", {
+              type: "slack",
+              workspace_integration_id: config.workspace_integration_id,
+              message: cleanedMessage,
+              metaData: message,
+            });
           }
+          // }
         );
 
         this.clients[config.workspace_integration_id]?.app.event(

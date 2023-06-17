@@ -24,6 +24,7 @@ export const storeS3File = async ({
       ".db",
       ".txt",
       ".pdf",
+      ".html",
     ];
     console.log(file.filename);
 

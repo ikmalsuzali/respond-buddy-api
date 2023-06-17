@@ -12,8 +12,8 @@ export const textLoader = async (tempFile: string) => {
   const outputText: string = await fsPromise.readFile(tempFile, "utf8");
 
   const textSplitter = new RecursiveCharacterTextSplitter({
-    chunkSize: 200,
-    chunkOverlap: 10,
+    chunkSize: 5000,
+    chunkOverlap: 100,
   });
   const docs = await textSplitter.createDocuments([outputText]);
 
@@ -25,7 +25,7 @@ export const htmlLoader = async (tempFile: string) => {
   const outputText: string = await fsPromise.readFile(tempFile, "utf8");
 
   const splitter = RecursiveCharacterTextSplitter.fromLanguage("html", {
-    chunkSize: 1000,
+    chunkSize: 5000,
     chunkOverlap: 200,
   });
 

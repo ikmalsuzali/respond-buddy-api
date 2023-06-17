@@ -93,34 +93,36 @@ export const getTextByWebsiteURL = async (url: string) => {
     const $ = cheerio.load(html);
 
     // Extract all the text from the HTML
-    const title = $("title").text();
-    const metaDescription = $('meta[name="description"]').attr("content");
-    const headings = $("h1, h2, h3")
-      .map((index, element) => $(element).html())
-      .get();
-    const links = $("a")
-      .filter((index, element) => $(element).children("img").length === 0) // Exclude <a> tags with <img> children
-      .map((index, element) => $(element).html())
-      .get();
+    //   const title = $("title").text();
+    //   const metaDescription = $('meta[name="description"]').attr("content");
+    //   const headings = $("h1, h2, h3")
+    //     .map((index, element) => $(element).html())
+    //     .get();
+    //   const links = $("a")
+    //     .filter((index, element) => $(element).children("img").length === 0) // Exclude <a> tags with <img> children
+    //     .map((index, element) => $(element).html())
+    //     .get();
 
-    const remappedHTML = `
-    <html>
-      <head>
-        <title>${title}</title>
-        <meta name="description" content="${metaDescription}">
-      </head>
-      <body>
-        <h1>Headings:</h1>
-        <ul>
-          ${headings.map((heading) => `<li>${heading}</li>`).join("")}
-        </ul>
-        <h1>Links:</h1>
-        <ul>
-          ${links.map((link) => `<li>${link}</li>`).join("")}
-        </ul>
-      </body>
-    </html>
-  `;
+    //   const remappedHTML = `
+    //   <html>
+    //     <head>
+    //       <title>${title}</title>
+    //       <meta name="description" content="${metaDescription}">
+    //     </head>
+    //     <body>
+    //       <h1>Headings:</h1>
+    //       <ul>
+    //         ${headings.map((heading) => `<li>${heading}</li>`).join("")}
+    //       </ul>
+    //       <h1>Links:</h1>
+    //       <ul>
+    //         ${links.map((link) => `<li>${link}</li>`).join("")}
+    //       </ul>
+    //     </body>
+    //   </html>
+    // `;
+
+    const remappedHTML = $("body").text();
 
     // Print the extracted text
     console.log("remappedHTMl", remappedHTML);
