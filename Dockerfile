@@ -1,6 +1,6 @@
 FROM node:18-alpine
 
-ENV port=8090
+ENV port=8080
 COPY . .
 
 RUN apk add --update python3 make g++\
@@ -29,5 +29,5 @@ RUN echo $DATABASE_URL
 RUN apk add openssl1.1-compat
 RUN yarn
 
-EXPOSE 8090
+EXPOSE 8080
 CMD [ "yarn", "build" ]
