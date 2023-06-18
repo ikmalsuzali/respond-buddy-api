@@ -10,7 +10,7 @@
     "db:seed": "prisma db seed",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
-    "build": "tsc",
+    "build": "export NODE_OPTIONS=--max_old_space_size=8192 && tsc",
     "dev": "ts-node src/main.ts",
     "dev:watch": "nodemon src/main.ts",
     "heroku-postbuild": "tsc",
