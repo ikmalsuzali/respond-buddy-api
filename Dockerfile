@@ -25,6 +25,9 @@ ARG TELEGRAM_TOKEN
 ARG DISCORD_TOKEN
 
 RUN echo $DATABASE_URL
+RUN echo $SUPABASE_KEY
+RUN echo $SUPABASE_URL
+
 
 RUN apk add openssl1.1-compat
 RUN yarn
