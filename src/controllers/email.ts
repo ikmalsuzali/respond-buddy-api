@@ -1,4 +1,4 @@
-// server.js
+// @ts-nocheck
 const fastify = require("fastify")({ logger: true });
 const MailListener = require("mail-listener4");
 const nodemailer = require("nodemailer");

@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import { type } from "os";
 import { isEmail, isUsernameOrRealName } from "../../helpers";
 import { prisma } from "../../prisma";

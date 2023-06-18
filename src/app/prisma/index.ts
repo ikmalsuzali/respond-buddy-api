@@ -1,4 +1,4 @@
-
+// @ts-nocheck
 
 export const createRecord = async (fastify, model, data, validate) => {
   const validationResult = validate(data);

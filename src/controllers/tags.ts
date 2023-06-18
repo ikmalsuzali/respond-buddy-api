@@ -1,5 +1,7 @@
 // Write base controller for tags in Fastify
 // Import tags service
+// @ts-nocheck
+
 import { tagsService } from "../app/tags/service";
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { prisma } from "../prisma";

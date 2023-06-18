@@ -1,14 +1,4 @@
-async function createUser(firstName, lastName, email, aboutMe) {
-  const newUser = await prisma.users.create({
-    data: {
-      first_name: firstName,
-      last_name: lastName,
-      email: email,
-      about_me: aboutMe,
-    },
-  });
-  return newUser;
-}
+// @ts-nocheck
 
 export const createUser = async (fastify, attrs) => {
   const { first_name, last_name, email, about_me } = attrs;

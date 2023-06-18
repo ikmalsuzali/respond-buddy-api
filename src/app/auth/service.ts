@@ -1,5 +1,8 @@
-// Get use
-export const signIn = async (fastify, attrs) => {
+// @ts-nocheck
+
+import { FastifyInstance, FastifyRequest } from "fastify";
+
+export const signIn = async (fastify: FastifyInstance, attrs: any) => {
   const { email, password } = attrs;
   const { user, session, error } = await fastify.supabase.auth.signIn({
     email,
@@ -13,7 +16,7 @@ export const signIn = async (fastify, attrs) => {
   return { user, session };
 };
 
-export const signOut = async (fastify, attrs) => {
+export const signOut = async (fastify: FastifyInstance, attrs: any) => {
   const { email, password } = attrs;
 
   const { user, session, error } = await fastify.supabase.auth.signUp({

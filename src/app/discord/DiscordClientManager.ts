@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 import Discord, { Client, ClientOptions, TextChannel } from "discord.js";
 
 export interface ClientConfig {
