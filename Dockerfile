@@ -28,6 +28,10 @@ RUN echo $DATABASE_URL
 RUN echo $SUPABASE_KEY
 RUN echo $SUPABASE_URL
 
+COPY . .
+COPY package*.json ./
+
+
 
 RUN apk add openssl1.1-compat
 RUN yarn
