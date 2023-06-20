@@ -75,6 +75,7 @@ export function authRoutes(fastify: FastifyInstance) {
         email,
         password,
         confirm_password,
+        username,
         workspace_name,
         workspace_email,
         workspace_description,
@@ -107,6 +108,7 @@ export function authRoutes(fastify: FastifyInstance) {
       if (!publicUser) {
         publicUser = await prisma.users.create({
           data: {
+            username: username || user?.email,
             email: user?.email,
             user_id: user?.id,
           },
