@@ -16,6 +16,7 @@ model users {
   email           String            @db.VarChar
   about_me        String?           @db.VarChar
   user_id         String?           @db.Uuid
+  username        String?           @db.VarChar
   user_workspaces user_workspaces[]
 }
 

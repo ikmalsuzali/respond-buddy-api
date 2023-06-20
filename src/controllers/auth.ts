@@ -127,7 +127,7 @@ export function authRoutes(fastify: FastifyInstance) {
         },
       });
 
-      const workspaceUser = await prisma.user_workspaces.create({
+      const userWorkspace = await prisma.user_workspaces.create({
         data: {
           user: publicUser?.id,
           workspace: workspace?.id,
@@ -148,7 +148,7 @@ export function authRoutes(fastify: FastifyInstance) {
 
       reply.code(200).send({
         user,
-        workspace_user: workspaceUser,
+        user_workspace: userWorkspace,
         session: token,
       });
     }
