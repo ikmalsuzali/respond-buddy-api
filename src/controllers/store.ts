@@ -6,8 +6,32 @@ import { storeS3File } from "../app/s3/service";
 import fs from "fs";
 import os from "os";
 import { htmlLoader, loadS3File, textLoader } from "../app/loader/service";
+import { prisma } from "../prisma";
 
 export function storeRoutes(fastify: FastifyInstance) {
+  fastify.get("/api/v1/store", async (request, reply) => {
+    const { page, limit } = request.query || {};
+
+    try {
+      const data = await prisma.store_types.findMany({
+        take: limit,
+        skip: page,
+      });
+
+      if (!data) {
+        throw new Error("Store types not found.");
+      }
+
+      reply.send({
+        success: true,
+        message: "Store types retrieved successfully.",
+        data: data,
+      });
+    } catch (error) {
+      reply.badRequest(error);
+    }
+  });
+
   fastify.post("/api/v1/store", async (request, reply) => {
     const { text, urls, type, tags, s3_url, metadata } = request.body || {};
     const tempFilePath = `${os.tmpdir()}/temp_file.txt`;

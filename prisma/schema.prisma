@@ -196,3 +196,11 @@ model store_tags {
   store_storeTostore_tags store?    @relation(fields: [store], references: [id], onUpdate: NoAction)
   tags                    tags?     @relation(fields: [tag], references: [id], onUpdate: NoAction)
 }
+
+model store_types {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String?   @db.VarChar
+  fields     Json?
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  slug       String?   @unique
+}
