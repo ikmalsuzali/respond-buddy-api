@@ -203,4 +203,5 @@ model store_types {
   fields     Json?
   created_at DateTime? @default(now()) @db.Timestamptz(6)
   slug       String?   @unique
+  icon       String?   @db.VarChar
 }
