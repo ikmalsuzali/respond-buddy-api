@@ -9,7 +9,7 @@ import { htmlLoader, loadS3File, textLoader } from "../app/loader/service";
 import { prisma } from "../prisma";
 
 export function storeRoutes(fastify: FastifyInstance) {
-  fastify.get("/api/v1/store", async (request, reply) => {
+  fastify.get("/api/v1/store-type", async (request, reply) => {
     const { page, limit } = request.query || {};
 
     try {
@@ -25,6 +25,33 @@ export function storeRoutes(fastify: FastifyInstance) {
       reply.send({
         success: true,
         message: "Store types retrieved successfully.",
+        data: data,
+      });
+    } catch (error) {
+      reply.badRequest(error);
+    }
+  });
+
+  fastify.get("/api/v1/store", async (request, reply) => {
+    const { page, limit, store_type_ids } = request.query || {};
+    try {
+      const data = await prisma.stores.findMany({
+        take: limit,
+        skip: page,
+        where: {
+          store_type_id: {
+            in: store_type_ids,
+          },
+        },
+      });
+
+      if (!data) {
+        throw new Error("Stores not found.");
+      }
+
+      reply.send({
+        success: true,
+        message: "Stores retrieved successfully.",
         data: data,
       });
     } catch (error) {
