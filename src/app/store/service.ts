@@ -24,13 +24,15 @@ import { prisma } from "../../prisma";
 // 3. Save all the tags related to the store
 
 export const saveStore = async (attrs: any) => {
-  const { workspaceId, type, tags, urls, docs, outputText } = attrs;
+  const { workspaceId, type, tags, url, docs, outputText, metadata } = attrs;
 
   const store = await prisma.store.create({
     data: {
       type,
       output_text: outputText,
       workspace: workspaceId,
+      metadata,
+      raw_s3_url: url
     },
   });
 

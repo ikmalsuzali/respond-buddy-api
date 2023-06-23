@@ -49,6 +49,7 @@ export const storeS3File = async ({
       return {
         data,
         newKey,
+        url: `https://respondbuddy.sfo3.cdn.digitaloceanspaces.com/${newKey}`
       };
     }
     throw new Error("File type not supported");
