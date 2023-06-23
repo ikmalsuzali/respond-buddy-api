@@ -5,8 +5,9 @@ import { eventManager } from "../main";
 import { storeS3File } from "../app/s3/service";
 import fs from "fs";
 import os from "os";
-import { htmlLoader, loadS3File, textLoader } from "../app/loader/service";
 import { prisma } from "../prisma";
+import { htmlLoader, loadFile, textLoader, excelLoader } from "../app/loader/service";
+import { GoogleSheetService } from "../app/google/GoogleSheetService";
 
 export function storeRoutes(fastify: FastifyInstance) {
   fastify.get("/api/v1/store", async (request, reply) => {
@@ -37,6 +38,7 @@ export function storeRoutes(fastify: FastifyInstance) {
     const tempFilePath = `${os.tmpdir()}/temp_file.txt`;
     let outputText = text;
     let docs = [];
+    let s3Url;
 
     // Comment first before done working on store S3
     // eventManager.emit("store-s3");
@@ -50,22 +52,40 @@ export function storeRoutes(fastify: FastifyInstance) {
           if (err) throw new Error(err);
 
           // Store text file
-          await storeS3File({
-            // Hard code filename & toBuffer function below as these information need in store S3 file function
-            file: {
-              filename: tempFilePath,
-              toBuffer: () => data,
-            },
-            workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
-          });
+            const storeResponse = await storeS3File({
+              // Hard code filename & toBuffer function below as these information need in store S3 file function
+              file: {
+                filename: tempFilePath,
+                toBuffer: () => data,
+              },
+              workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
+            });
+            s3Url = storeResponse?.url;
         });
       });
 
       return textLoader(tempFilePath);
     };
 
+    const readExcel = async(excelTempFilePath) => {
+      await fs.readFile(excelTempFilePath, async (err, data) => {
+        if (err) throw new Error(err);
+
+        const storeResponse = await storeS3File({
+          file: {
+            filename: excelTempFilePath,
+            toBuffer: () => data,
+          },
+          workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
+        });
+        s3Url = storeResponse?.url;
+      });
+
+      return excelLoader(excelTempFilePath)
+    }
+
     if (type === "raw" && text) {
-      docs = await convertRawFileToDocs();
+      docs = await convertRawFileToDocs(text);
     } else if (type === "website_url" && urls) {
       for (let i = 0; i < urls.length; i++) {
         const url = urls[i];
@@ -79,16 +99,40 @@ export function storeRoutes(fastify: FastifyInstance) {
     } else if (s3_url) {
       console.log("🚀 ~ file: store.ts:48 ~ fastify.post ~ s3_url:", s3);
 
-      docs = await loadS3File(s3_url);
+      docs = await loadFile({s3Url: s3_url});
+    } else if (type === 'google_spreadsheet') {
+      // TODO! This should store in a new table in supabase, but testing purpose pass in here first
+      const spreadsheetId = metadata.spreadsheetId;
+      const keyFile = 'credentials.json';
+      const scopes = 'https://www.googleapis.com/auth/spreadsheets';
+      const sheetName = metadata.sheetName;
+
+      const googleSheetService = new GoogleSheetService({
+        spreadsheetId,
+        keyFile,
+        scopes
+      })
+      
+      await googleSheetService.init()
+      outputText = googleSheetService.getSpreadsheetUrl()
+
+      const sheetData = await googleSheetService.getAllSheetData(sheetName)
+      const {tempFilePath: excelTempFilePath, tempFile: excelTempFile} = await googleSheetService.convertSheetDataToExcel(sheetData)
+
+      docs = await readExcel(excelTempFilePath)
+
+      googleSheetService.removeTempFile()
     }
 
+    console.log(s3Url)
     const storeData = await saveStore({
       outputText,
       workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
       type,
       docs,
-      urls,
+      url: s3Url,
       tags,
+      metadata
     });
 
     reply.send({
