@@ -65,9 +65,10 @@ export const docLoader = async (tempFile: string | null) => {
   return docs;
 };
 
-export const loadS3File = async (s3Url: string) => {
-  const tempFile = await convertS3UrlToTempFile(s3Url!);
-  console.log("🚀 ~ file: service.ts:69 ~ loadS3File ~ tempFile:", tempFile);
+export const loadFile = async ({s3Url, fileUrl}: {s3Url?: string, fileUrl?: string}) => {
+  const url = s3Url || fileUrl || ''
+  
+  const tempFile = s3Url ? await convertS3UrlToTempFile(s3Url!) : fileUrl;
 
   if (!tempFile) throw new Error("File does not exist");
 
@@ -75,15 +76,15 @@ export const loadS3File = async (s3Url: string) => {
     throw new Error("File does not exist");
   }
 
-  if (s3Url.includes(".txt")) {
+  if (url.includes(".txt")) {
     return await textLoader(tempFile);
-  } else if (s3Url.includes(".csv")) {
+  } else if (url.includes(".csv")) {
     return await csvLoader(tempFile);
-  } else if (s3Url.includes(".pdf")) {
+  } else if (url.includes(".pdf")) {
     return await pdfLoader(tempFile);
-  } else if (s3Url.includes(".docx")) {
+  } else if (url.includes(".docx")) {
     return await docLoader(tempFile);
-  } else if (s3Url.includes(".xlsx") || s3Url.includes(".xls")) {
+  } else if (url.includes(".xlsx") || url.includes(".xls")) {
     return await excelLoader(tempFile);
   } else {
     throw new Error("File type not supported");
