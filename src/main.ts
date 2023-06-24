@@ -217,7 +217,7 @@ const main = async () => {
         };
       });
 
-    // await slackClientManager.init(mappedWorkspaceSlackIntegrations);
+    await slackClientManager.init(mappedWorkspaceSlackIntegrations);
   } catch (err) {
     console.log(err);
     await prisma.$disconnect();
