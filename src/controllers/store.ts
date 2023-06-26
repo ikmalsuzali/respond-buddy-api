@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { FastifyInstance } from "fastify";
-import { getTextByWebsiteURL, saveStore } from "../app/store/service";
+import { computeFileMD5, getTextByWebsiteURL, saveStore } from "../app/store/service";
 import { eventManager } from "../main";
 import { storeS3File } from "../app/s3/service";
 import fs from "fs";
@@ -152,12 +152,18 @@ export function storeRoutes(fastify: FastifyInstance) {
     }
 
     console.log(s3Url)
+
+    let hash = null;
+    if (s3Url) {  
+      hash = await computeFileMD5(s3Url)
+    }
     const storeData = await saveStore({
       outputText,
       workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
       type,
       docs,
       url: s3Url,
+      hash,
       tags,
       metadata
     });

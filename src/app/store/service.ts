@@ -24,7 +24,18 @@ import { prisma } from "../../prisma";
 // 3. Save all the tags related to the store
 
 export const saveStore = async (attrs: any) => {
-  const { workspaceId, type, tags, url, docs, outputText, metadata } = attrs;
+  const { workspaceId, type, tags, url, docs, hash, outputText, metadata } =
+    attrs;
+
+  if (hash) {
+    const existingStore = await prisma.store.findUnique({
+      where: {
+        hash,
+      },
+    });
+
+    if (existingStore) throw new Error("Memory already exists");
+  }
 
   const store = await prisma.store.create({
     data: {
@@ -32,7 +43,8 @@ export const saveStore = async (attrs: any) => {
       output_text: outputText,
       workspace: workspaceId,
       metadata,
-      raw_s3_url: url
+      hash,
+      raw_s3_url: url,
     },
   });
 
@@ -175,4 +187,29 @@ export const getTextFromUploadedPdf = async (url: string) => {
   const docs = await loader.load();
 
   return docs;
+};
+
+export const computeFileMD5 = async (downloadUrl) => {
+  const chunkSize = 1024 * 1024; // 1MB chunks (you can adjust this value as needed)
+  const spark = new sparkMD5.ArrayBuffer();
+  let cursor = 0;
+
+  const response = await axios.get(downloadUrl, {
+    responseType: "arraybuffer",
+    headers: { "Accept-Encoding": "identity" },
+  });
+
+  const fileBuffer = response.data;
+  const fileSize = fileBuffer.byteLength;
+
+  while (cursor < fileSize) {
+    const chunkEnd = Math.min(cursor + chunkSize, fileSize);
+    const chunk = fileBuffer.slice(cursor, chunkEnd);
+    spark.append(chunk); // Append loaded chunk to the MD5 calculator
+    cursor += chunkSize;
+  }
+
+  // Complete the calculation and return the hash
+  const hash = spark.end();
+  return hash;
 };

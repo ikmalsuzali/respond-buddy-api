@@ -184,6 +184,7 @@ model store {
   type        String?      @db.VarChar
   raw_s3_url  String?      @db.VarChar
   gpt_s3_url  String?      @db.VarChar
+  hash        String?      @db.VarChar
   workspaces  workspaces?  @relation(fields: [workspace], references: [id], onUpdate: NoAction)
   store_tags  store_tags[]
 }
