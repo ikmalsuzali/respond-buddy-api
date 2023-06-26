@@ -159,12 +159,14 @@ export function storeRoutes(fastify: FastifyInstance) {
       googleSheetService.removeTempFile();
     }
 
-    console.log(s3Url);
+    console.log(s3_url);
 
     let hash = null;
-    if (s3Url) {
-      hash = await computeFileMD5(s3Url);
+    if (s3_url) {
+      hash = await computeFileMD5(s3_url);
+      console.log("🚀 ~ file: store.ts:167 ~ fastify.post ~ hash:", hash);
     }
+
     const storeData = await saveStore({
       outputText,
       workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,

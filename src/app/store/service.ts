@@ -6,6 +6,7 @@ import { PDFLoader } from "langchain/document_loaders/fs/pdf";
 import { getOrCreateTag } from "../tags/service.ts";
 import { storeDocsToRedis } from "../redis/service.ts";
 import { prisma } from "../../prisma";
+import sparkMD5 from "spark-md5";
 
 // What is a store
 // A store is a collection of vectors that are related to each other.
@@ -28,7 +29,7 @@ export const saveStore = async (attrs: any) => {
     attrs;
 
   if (hash) {
-    const existingStore = await prisma.store.findUnique({
+    const existingStore = await prisma.store.findFirst({
       where: {
         hash,
       },
