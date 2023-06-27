@@ -1,5 +1,6 @@
-[build]
-script = '''
+[phases.setup]
+code = '''
+  # Install necessary dependencies
   apk.add = ["python3" "make" "g++"];
   apk.del = ["gcc" "libc-dev"];
 '''
