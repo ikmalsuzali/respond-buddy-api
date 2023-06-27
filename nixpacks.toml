@@ -1,3 +1,5 @@
-[phases.setup]
-cmds = ['apk add --update python make g++\
-   && rm -rf /var/cache/apk/*]
+[build]
+script = '''
+  apk.add = ["python3" "make" "g++"];
+  apk.del = ["gcc" "libc-dev"];
+'''
