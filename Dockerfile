@@ -25,7 +25,7 @@ ARG TELEGRAM_TOKEN
 ARG DISCORD_TOKEN
 
 COPY . .
-COPY package*.json ./
+COPY package.json package-lock.json .npmrc ./
 
 RUN npm install -g ts-node
 
