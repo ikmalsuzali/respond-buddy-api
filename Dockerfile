@@ -29,7 +29,6 @@ COPY . .
 
 
 RUN npm install -g ts-node
-RUN npm rebuild bcrypt --build-from-source
 
 
 

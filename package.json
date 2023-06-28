@@ -52,7 +52,6 @@
     "@types/jest": "^29.5.1",
     "aws-sdk": "^2.1390.0",
     "base64-arraybuffer": "^1.0.2",
-    "bcrypt": "^5.1.0",
     "byte-length": "^1.0.2",
     "chatgpt": "^5.2.2",
     "cheerio": "^1.0.0-rc.12",
