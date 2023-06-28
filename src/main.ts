@@ -95,6 +95,10 @@ const main = async () => {
         type: "string",
         default: "",
       },
+      REDIS_URL: {
+        type: "string",
+        default: "",
+      },
     },
   };
 
@@ -112,7 +116,7 @@ const main = async () => {
   });
 
   redisClient = createClient({
-    url: "redis://178.128.30.115:6379",
+    url: process.env.REDIS_URL,
   });
 
   await redisClient.connect();
