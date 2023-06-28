@@ -62,6 +62,7 @@
     "fastify-error": "^1.2.0",
     "fastify-multer": "^2.0.3",
     "fastify-qs": "^4.0.1",
+    "d3-dsv": "2",
     "fastify-raw-body": "^4.2.0",
     "fastify-sensible": "^3.2.0",
     "fastify-stripe": "^2.4.1",
@@ -87,7 +88,6 @@
     "spamscanner": "^5.1.5",
     "spark-md5": "^3.0.2",
     "stripe": "^11.4.0",
-    "toad-scheduler": "^3.0.0",
     "ts-jest": "^29.1.0",
     "xlsx": "^0.18.5",
     "xml2js": "^0.6.0"
