@@ -21,8 +21,7 @@
     "seed": "ts-node src/seed.ts"
   },
   "engine": {
-    "node": "18.12.0",
-    "npm": "8.19.3"
+    "node": "18"
   },
   "devDependencies": {
     "@supabase/supabase-js": "^2.21.0",

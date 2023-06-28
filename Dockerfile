@@ -2,8 +2,8 @@ FROM node:18
 
 COPY . .
 
-RUN apk add --update python3 make g++\
-   && rm -rf /var/cache/apk/*
+# RUN apk add --update python3 make g++\
+#    && rm -rf /var/cache/apk/*
 
 ARG ENVIRONMENT
 ARG DATABASE_URL
