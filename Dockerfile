@@ -1,6 +1,5 @@
 FROM node:18-alpine
 
-ENV PORT=8080
 COPY . .
 
 RUN apk add --update python3 make g++\
@@ -23,6 +22,7 @@ ARG S3_ACCESS_KEY
 ARG S3_SECRET_KEY
 ARG TELEGRAM_TOKEN
 ARG DISCORD_TOKEN
+ARG PORT
 
 COPY package.json ./
 COPY . .
