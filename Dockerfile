@@ -1,6 +1,6 @@
 FROM node:18-alpine
 
-ENV port=8080
+ENV PORT=8080
 COPY . .
 
 RUN apk add --update python3 make g++\
@@ -24,8 +24,9 @@ ARG S3_SECRET_KEY
 ARG TELEGRAM_TOKEN
 ARG DISCORD_TOKEN
 
+COPY package.json ./
 COPY . .
-COPY package.json package-lock.json .npmrc ./
+
 
 RUN npm install -g ts-node
 
