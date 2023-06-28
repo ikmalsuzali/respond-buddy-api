@@ -33,5 +33,4 @@ RUN npm install -g ts-node
 RUN apk add openssl1.1-compat
 RUN yarn
 
-EXPOSE 8080
 CMD [ "yarn", "build" ]
