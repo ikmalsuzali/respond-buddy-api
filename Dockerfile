@@ -33,4 +33,4 @@ RUN apk add openssl1.1-compat
 RUN yarn
 
 EXPOSE 8080
-CMD [ "yarn", "start" ]
+CMD [ "yarn", "build" ]
