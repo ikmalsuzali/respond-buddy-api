@@ -1,4 +1,5 @@
 [phases.setup]
+nixPkgs = ["python38"]
 code = '''
   # Install necessary dependencies
   apk.add = ["python3" "make" "g++"];

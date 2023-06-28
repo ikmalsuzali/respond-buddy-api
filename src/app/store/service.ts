@@ -31,6 +31,7 @@ export const saveStore = async (attrs: any) => {
   if (hash) {
     const existingStore = await prisma.store.findFirst({
       where: {
+        workspace: workspaceId,
         hash,
       },
     });
