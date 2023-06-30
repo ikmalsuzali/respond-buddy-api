@@ -25,8 +25,17 @@ import sparkMD5 from "spark-md5";
 // 3. Save all the tags related to the store
 
 export const saveStore = async (attrs: any) => {
-  const { workspaceId, type, tags, url, docs, hash, outputText, metadata } =
-    attrs;
+  const {
+    workspaceId,
+    type,
+    tags,
+    url,
+    docs,
+    hash,
+    outputText,
+    metadata,
+    s3Id,
+  } = attrs;
 
   if (hash) {
     const existingStore = await prisma.store.findFirst({
@@ -47,8 +56,11 @@ export const saveStore = async (attrs: any) => {
       metadata,
       hash,
       raw_s3_url: url,
+      s3_s3Tostore: s3Id,
     },
   });
+
+  let redisKey = `${workspaceId}:${storeId}`;
 
   console.log("🚀 ~ file: service.ts:45 ~ saveStore ~ docs:", docs);
 
@@ -57,6 +69,7 @@ export const saveStore = async (attrs: any) => {
     workspaceId: workspaceId,
     storeId: store.id,
     tags,
+    redisKey,
   });
 
   const storeTags = [];
@@ -214,4 +227,45 @@ export const computeFileMD5 = async (downloadUrl) => {
   // Complete the calculation and return the hash
   const hash = spark.end();
   return hash;
+};
+
+export const convertRawFileToDocs = async (text) => {
+  fs.writeFile(tempFilePath, text, async (err) => {
+    if (err) throw new Error(err);
+
+    // Read the local file content
+    fs.readFile(tempFilePath, async (err, data) => {
+      if (err) throw new Error(err);
+
+      // Store text file
+      const storeResponse = await storeS3File({
+        // Hard code filename & toBuffer function below as these information need in store S3 file function
+        file: {
+          filename: tempFilePath,
+          toBuffer: () => data,
+        },
+        workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
+      });
+      s3Url = storeResponse?.url;
+    });
+  });
+
+  return textLoader(tempFilePath);
+};
+
+export const readExcel = async (excelTempFilePath) => {
+  fs.readFile(excelTempFilePath, async (err, data) => {
+    if (err) throw new Error(err);
+
+    const storeResponse = await storeS3File({
+      file: {
+        filename: excelTempFilePath,
+        toBuffer: () => data,
+      },
+      workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
+    });
+    s3Url = storeResponse?.url;
+  });
+
+  return excelLoader(excelTempFilePath);
 };

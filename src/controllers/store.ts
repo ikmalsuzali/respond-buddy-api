@@ -4,18 +4,12 @@ import {
   computeFileMD5,
   getTextByWebsiteURL,
   saveStore,
+  readExcel,
+  convertRawFileToDocs,
 } from "../app/store/service";
-import { eventManager } from "../main";
-import { storeS3File } from "../app/s3/service";
-import fs from "fs";
 import os from "os";
 import { prisma } from "../prisma";
-import {
-  htmlLoader,
-  loadFile,
-  textLoader,
-  excelLoader,
-} from "../app/loader/service";
+import { loadFile } from "../app/loader/service";
 import { GoogleSheetService } from "../app/google/GoogleSheetService";
 
 export function storeRoutes(fastify: FastifyInstance) {
@@ -79,60 +73,16 @@ export function storeRoutes(fastify: FastifyInstance) {
     // Comment first before done working on store S3
     // eventManager.emit("store-s3");
 
-    const convertRawFileToDocs = async (text) => {
-      await fs.writeFile(tempFilePath, text, async (err) => {
-        if (err) throw new Error(err);
-
-        // Read the local file content
-        await fs.readFile(tempFilePath, async (err, data) => {
-          if (err) throw new Error(err);
-
-          // Store text file
-          const storeResponse = await storeS3File({
-            // Hard code filename & toBuffer function below as these information need in store S3 file function
-            file: {
-              filename: tempFilePath,
-              toBuffer: () => data,
-            },
-            workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
-          });
-          s3Url = storeResponse?.url;
-        });
-      });
-
-      return textLoader(tempFilePath);
-    };
-
-    const readExcel = async (excelTempFilePath) => {
-      await fs.readFile(excelTempFilePath, async (err, data) => {
-        if (err) throw new Error(err);
-
-        const storeResponse = await storeS3File({
-          file: {
-            filename: excelTempFilePath,
-            toBuffer: () => data,
-          },
-          workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
-        });
-        s3Url = storeResponse?.url;
-      });
-
-      return excelLoader(excelTempFilePath);
-    };
-
     if (type === "raw" && text) {
       docs = await convertRawFileToDocs(text);
     } else if (type === "website_url" && urls) {
-      for (let i = 0; i < urls.length; i++) {
-        const url = urls[i];
-
+      for (const url of urls) {
         const text = await getTextByWebsiteURL(url);
-
         outputText += text;
       }
 
       docs = await convertRawFileToDocs(outputText);
-    } else if (s3_url) {
+    } else if (type === "upload" && s3_url) {
       docs = await loadFile({ s3Url: s3_url });
     } else if (type === "google_spreadsheet") {
       // TODO! This should store in a new table in supabase, but testing purpose pass in here first
@@ -159,23 +109,29 @@ export function storeRoutes(fastify: FastifyInstance) {
       googleSheetService.removeTempFile();
     }
 
-    console.log(s3_url);
-
     let hash = null;
+    let s3UrlData = null;
     if (s3_url) {
       hash = await computeFileMD5(s3_url);
       console.log("🚀 ~ file: store.ts:167 ~ fastify.post ~ hash:", hash);
+
+      s3UrlData = await prisma.s3.findFirst({
+        where: {
+          s3_url,
+        },
+      });
     }
 
     const storeData = await saveStore({
-      outputText,
       workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
+      outputText,
       type,
       docs,
-      url: s3Url,
+      url: s3_url,
       hash,
       tags,
       metadata,
+      s3Id: s3UrlData?.id,
     });
 
     reply.send({

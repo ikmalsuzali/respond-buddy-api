@@ -9,11 +9,13 @@ export const storeDocsToRedis = async ({
   workspaceId,
   storeId,
   tags,
+  redisKey,
 }: {
   docs: Document[];
   workspaceId: string;
   storeId: string;
   tags: string[];
+  redisKey: string;
 }) => {
   const docsInit = docs.map(
     (doc) =>
@@ -32,7 +34,7 @@ export const storeDocsToRedis = async ({
     {
       // @ts-ignore
       redisClient,
-      indexName: `${workspaceId}:${storeId}`,
+      indexName: redisKey,
     }
   );
 

@@ -25,7 +25,14 @@ export function s3Routes(fastify: FastifyInstance) {
       // Save the doc from loaders to s3 also based on filename.gpt
       // Save the file in redis
 
-      const fileUrl = uploadResult?.data.location;
+      await prisma.s3.create({
+        data: {
+          workspace: request?.token_metadata?.custom_metadata?.workspace_id,
+          original_name: uploadResult?.data.originalName,
+          s3_name: uploadResult?.data.newKey,
+          s3_url: fileUrl,
+        },
+      });
 
       reply.code(200).send({
         url:
