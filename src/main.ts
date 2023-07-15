@@ -203,8 +203,10 @@ const main = async () => {
       integration_name: "email",
     });
     const workspaceSlackIntegrations = await getAllUserWorkspaces(server, {
-      integration_name: "slack",
+      integration_name: "Slack",
     });
+
+    console.log(workspaceSlackIntegrations);
     // mailListenerManager.init(workspaceEmailIntegrations);
     const mappedWorkspaceSlackIntegrations: ClientConfig[] =
       workspaceSlackIntegrations.map((workspaceSlackIntegration) => {
@@ -221,7 +223,7 @@ const main = async () => {
         };
       });
 
-    // await slackClientManager.init(mappedWorkspaceSlackIntegrations);
+    await slackClientManager.init(mappedWorkspaceSlackIntegrations);
   } catch (err) {
     console.log(err);
     await prisma.$disconnect();

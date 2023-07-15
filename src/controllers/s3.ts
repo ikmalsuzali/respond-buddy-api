@@ -2,13 +2,17 @@
 import { FastifyInstance } from "fastify";
 import { deleteS3File, storeS3File } from "../app/s3/service";
 import { upload, eventManager } from "../main";
+import { prisma } from "../prisma";
 
 export function s3Routes(fastify: FastifyInstance) {
   fastify.post("/api/v1/file/upload", async (request, reply) => {
     try {
       const file = await request.body.file;
 
+      const fileSize = file?.file?.bytesRead || file?.byteLength || file.size;
+
       console.log("🚀 ~ file: s3.ts:49 ~ fastify.post ~ file:", file);
+      console.log("🚀 ~ file: s3.ts:13 ~ fastify.post ~ fileSize:", fileSize);
 
       const uploadResult = await storeS3File({
         file: file,
@@ -28,9 +32,12 @@ export function s3Routes(fastify: FastifyInstance) {
       await prisma.s3.create({
         data: {
           workspace: request?.token_metadata?.custom_metadata?.workspace_id,
-          original_name: uploadResult?.data.originalName,
-          s3_name: uploadResult?.data.newKey,
-          s3_url: fileUrl,
+          original_name: file.filename,
+          s3_name: uploadResult?.newKey,
+          s3_url:
+            "https://respondbuddy.sfo3.cdn.digitaloceanspaces.com/" +
+            uploadResult?.newKey,
+          file_size: fileSize,
         },
       });
 

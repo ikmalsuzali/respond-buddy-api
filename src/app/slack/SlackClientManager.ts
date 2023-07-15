@@ -27,10 +27,11 @@ class SlackClientManager {
   }
 
   async init(clientConfigs: ClientConfig[]) {
-    console.log("Initializing Slack clients...");
+    console.log("Initializing Slack clients...", clientConfigs);
 
     try {
       clientConfigs.forEach(async (config) => {
+        console.log(config);
         this.clients[config.workspace_integration_id] = {
           app: new App({
             token: config.token,
@@ -45,6 +46,7 @@ class SlackClientManager {
 
         this.clients[config.workspace_integration_id]?.app.message(
           async ({ message }) => {
+            console.log("mesasge");
             // if (message?.text?.includes(`<@U05AMCB0SE4>`)) {
             const regex = /<@.*?>/g;
             const cleanedMessage = message.text.replace(regex, "");

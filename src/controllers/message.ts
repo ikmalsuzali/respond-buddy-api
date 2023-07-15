@@ -60,15 +60,20 @@ export function messageEvents(fastify: FastifyInstance) {
     let foundDocs: Document<Record<string, any>>[] = [];
 
     try {
-      for (const store of stores) {
-        const similarDocs = await getDocsFromRedis({
+      const getDocsFromRedisInParallel: any = stores.map((store) => {
+        return getDocsFromRedis({
           workspaceId: workspaceIntegration!.workspace,
           storeId: store.id,
           message: data.message,
+          similarityCount: 1,
         });
+      });
 
-        foundDocs = [...foundDocs, ...similarDocs];
-      }
+      const results = await Promise.all(getDocsFromRedisInParallel);
+
+      console.log("results", results);
+
+      foundDocs = [...foundDocs, ...results?.[0]];
     } catch (error) {
       console.log(error);
     }
@@ -84,6 +89,7 @@ export function messageEvents(fastify: FastifyInstance) {
     );
 
     const model = new OpenAI({});
+
     const chain = RetrievalQAChain.fromLLM(model, vectorStore.asRetriever());
 
     const res = await chain.call({

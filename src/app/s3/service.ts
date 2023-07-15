@@ -25,16 +25,15 @@ export const storeS3File = async ({
       ".txt",
       ".pdf",
       ".html",
+      ".XLSX",
     ];
-    console.log(file.filename);
 
-    const extension = path.extname(file.filename);
+    const extension = path?.extname(file?.filename);
 
     if (allowedExtensions.includes(extension)) {
       console.log(file);
 
       const fileBuffer = Buffer.from(await file.toBuffer(), "base64");
-      console.log("🚀 ~ file: service.ts:31 ~ fileBuffer:", fileBuffer);
       const newKey = key || `${workspaceId}_${Date.now()}${extension}`;
       const uploadParams = {
         Bucket: "respondbuddy",
@@ -42,18 +41,15 @@ export const storeS3File = async ({
         Body: fileBuffer,
         ACL: "public-read",
       };
-      console.log("🚀 ~ file: service.ts:36 ~ uploadParams:", uploadParams);
 
       const data = await s3.send(new PutObjectCommand(uploadParams));
       console.log("File uploaded successfully:", data);
       return {
         data,
         newKey,
-        url: `https://respondbuddy.sfo3.cdn.digitaloceanspaces.com/${newKey}`
+        url: `https://respondbuddy.sfo3.cdn.digitaloceanspaces.com/${newKey}`,
       };
     }
-
-    
 
     throw new Error("File type not supported");
   } catch (error) {

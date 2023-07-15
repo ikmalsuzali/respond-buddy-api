@@ -6,11 +6,13 @@ import {
   saveStore,
   readExcel,
   convertRawFileToDocs,
+  convertUrlToFilename,
+  countFilteredStores,
 } from "../app/store/service";
-import os from "os";
 import { prisma } from "../prisma";
 import { loadFile } from "../app/loader/service";
 import { GoogleSheetService } from "../app/google/GoogleSheetService";
+import { getDocsFromRedis } from "../app/redis/service";
 
 export function storeRoutes(fastify: FastifyInstance) {
   fastify.get("/api/v1/store-type", async (request, reply) => {
@@ -20,11 +22,27 @@ export function storeRoutes(fastify: FastifyInstance) {
       const data = await prisma.store_types.findMany({
         take: limit,
         skip: page,
+        where: {
+          is_deleted: false,
+        },
       });
 
       if (!data) {
         throw new Error("Store types not found.");
       }
+
+      console.log(data);
+
+      // const result = await Promise.all(
+      //   data.map((storeType) => {
+      //     countFilteredStores(
+      //       request?.token_metadata?.custom_metadata?.workspace_id,
+      //       storeType.id
+      //     );
+      //   })
+      // );
+
+      // console.log(result);
 
       reply.send({
         success: true,
@@ -36,27 +54,189 @@ export function storeRoutes(fastify: FastifyInstance) {
     }
   });
 
+  fastify.get("/api/v1/store/docs", async (request, reply) => {
+    const { search } = request.query || {};
+    const workspaceId = request?.token_metadata?.custom_metadata?.workspace_id;
+    const keys = {};
+
+    const stores = await prisma.store.findMany({
+      where: {
+        workspace: request?.token_metadata?.custom_metadata?.workspace_id,
+      },
+      include: {
+        s3_s3Tostore: true,
+        store_types: true,
+      },
+    });
+
+    console.log("🚀 ~ file: store.ts:50 ~ fastify.get ~ stores:", stores);
+
+    if (!search) {
+      reply.send({
+        success: true,
+        message: "Docs retrieved successfully.",
+        data: {
+          stores: stores,
+        },
+      });
+    }
+
+    const getDocsFromRedisInParallel = stores.map((store) => {
+      return getDocsFromRedis({
+        workspaceId,
+        storeId: store.id,
+        message: search,
+        similarityCount: 5,
+      });
+    });
+
+    const results = await Promise.all(getDocsFromRedisInParallel);
+    console.log("🚀 ~ file: store.ts:70 ~ fastify.get ~ results:", results);
+    for (const result of results) {
+      console.log(
+        "🚀 ~ file: store.ts:72 ~ fastify.get ~ result:",
+        result?.[0]?.[0]?.metadata
+      );
+      if (
+        result?.[0]?.[0]?.metadata?.workspace_id &&
+        result?.[0]?.[0]?.metadata?.store_id
+      ) {
+        keys[
+          `${result?.[0]?.[0]?.metadata?.workspace_id}:${result?.[0]?.[0]?.metadata?.store_id}`
+        ] = {
+          docs: result,
+          store_data: stores.find(
+            (store) => store.id === result?.[0]?.[0]?.metadata?.store_id
+          ),
+        };
+      }
+    }
+
+    console.log("🚀 ~ file: store.ts:74 ~ fastify.get ~ keys:", keys);
+
+    if (!search) {
+      reply.send({
+        success: true,
+        message: "Docs retrieved successfully.",
+        data: [],
+      });
+      return;
+    }
+
+    reply.send({
+      success: true,
+      message: "Docs retrieved successfully.",
+      data: keys,
+    });
+  });
+
   fastify.get("/api/v1/store", async (request, reply) => {
-    const { page, limit, store_type_ids } = request.query || {};
+    const {
+      search,
+      page,
+      limit,
+      store_types,
+      sortField,
+      sortOrder,
+    }: {
+      search: string;
+      page: number;
+      limit: number;
+      store_types: string[];
+      sortField: string;
+      sortOrder: string;
+    } = request.query || {};
+
+    const pageLimit = parseInt(limit);
+    const skip = (page - 1) * pageLimit;
+    let where = {
+      workspace: request?.token_metadata?.custom_metadata?.workspace_id,
+    };
+    let orderBy = {
+      ["created_at"]: sortOrder || "desc",
+    };
+
+    if (store_types?.length > 0) {
+      where.store_type_id = {
+        in: store_types,
+      };
+    }
+
+    if (sortField) {
+      orderBy = {
+        [sortField]: sortOrder || "desc",
+      };
+    }
+
+    if (sortField === "name") {
+      orderBy = {
+        s3_s3Tostore: {
+          original_name: sortOrder || "desc",
+        },
+      };
+    }
+
+    if (sortField === "size") {
+      orderBy = {
+        s3_s3Tostore: {
+          file_size: sortOrder || "desc",
+        },
+      };
+    }
+
+    if (sortField === "created_by") {
+      orderBy = {
+        users: {
+          name: sortOrder || "desc",
+        },
+      };
+    }
+
+    if (search) {
+      where.s3_s3Tostore = {
+        original_name: {
+          contains: search,
+        },
+      };
+    }
+
     try {
-      const data = await prisma.stores.findMany({
-        take: limit,
-        skip: page,
-        where: {
-          store_type_id: {
-            in: store_type_ids,
-          },
+      const stores = await prisma.store.findMany({
+        take: pageLimit,
+        skip,
+        where,
+        orderBy,
+        include: {
+          s3_s3Tostore: true,
+          store_types: true,
+          users: true,
         },
       });
 
-      if (!data) {
-        throw new Error("Stores not found.");
+      const totalStores = await prisma.store.findMany({
+        where: {
+          workspace: request?.token_metadata?.custom_metadata?.workspace_id,
+        },
+      });
+
+      if (!stores) {
+        reply.send({
+          success: true,
+          message: "No memories found",
+          data: {
+            stores: [],
+            total_count: totalStores.length,
+          },
+        });
       }
 
       reply.send({
         success: true,
-        message: "Stores retrieved successfully.",
-        data: data,
+        message: "Memories retrieved successfully.",
+        data: {
+          stores: stores,
+          total_count: totalStores.length,
+        },
       });
     } catch (error) {
       reply.badRequest(error);
@@ -64,24 +244,36 @@ export function storeRoutes(fastify: FastifyInstance) {
   });
 
   fastify.post("/api/v1/store", async (request, reply) => {
-    const { text, urls, type, tags, s3_url, metadata } = request.body || {};
-    const tempFilePath = `${os.tmpdir()}/temp_file.txt`;
+    const { filename, text, url, type, store_type, tags, s3_url, metadata } =
+      request.body || {};
     let outputText = text;
     let docs = [];
-    let s3Url;
+    let s3Url = s3_url;
 
-    // Comment first before done working on store S3
-    // eventManager.emit("store-s3");
+    if (type === "raw") {
+      if (!text) throw new Error("Text is required.");
+      const rawData = await convertRawFileToDocs({
+        text,
+        workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
+        filename: filename || "Untitled text",
+      });
 
-    if (type === "raw" && text) {
-      docs = await convertRawFileToDocs(text);
-    } else if (type === "website_url" && urls) {
-      for (const url of urls) {
-        const text = await getTextByWebsiteURL(url);
-        outputText += text;
-      }
+      console.log("🚀 ~ file: store.ts:213 ~ fastify.post ~ _docs:", rawData);
 
-      docs = await convertRawFileToDocs(outputText);
+      docs = rawData.docs;
+      s3Url = rawData.s3Url;
+    } else if (type === "website_url" && url) {
+      const text = await getTextByWebsiteURL(url);
+      outputText += text;
+
+      const rawData = await convertRawFileToDocs({
+        text: outputText,
+        workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
+        filename: convertUrlToFilename(url),
+      });
+
+      docs = rawData.docs;
+      s3Url = rawData.s3Url;
     } else if (type === "upload" && s3_url) {
       docs = await loadFile({ s3Url: s3_url });
     } else if (type === "google_spreadsheet") {
@@ -111,33 +303,64 @@ export function storeRoutes(fastify: FastifyInstance) {
 
     let hash = null;
     let s3UrlData = null;
-    if (s3_url) {
-      hash = await computeFileMD5(s3_url);
-      console.log("🚀 ~ file: store.ts:167 ~ fastify.post ~ hash:", hash);
+    if (s3Url) {
+      hash = await computeFileMD5(s3Url);
 
       s3UrlData = await prisma.s3.findFirst({
         where: {
-          s3_url,
+          s3_url: s3Url,
         },
       });
     }
 
+    console.log("🚀 ~ file: store.ts:251 ~ fastify.post ~ docs:", docs);
+
     const storeData = await saveStore({
+      createdBy: request.token_metadata.custom_metadata?.user_id,
       workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
       outputText,
       type,
       docs,
-      url: s3_url,
+      url: s3Url,
       hash,
       tags,
       metadata,
       s3Id: s3UrlData?.id,
+      storeTypeId: store_type,
     });
 
     reply.send({
       success: true,
       message: "Store saved successfully.",
       data: storeData,
+    });
+  });
+
+  fastify.delete("/api/v1/store/:id", async (request, reply) => {
+    const { id } = request.params;
+    const store = await prisma.store.findUnique({
+      where: {
+        id: id,
+      },
+    });
+
+    if (!store) {
+      reply.send({
+        success: false,
+        message: "Store not found.",
+      });
+      return;
+    }
+
+    await prisma.store.delete({
+      where: {
+        id: id,
+      },
+    });
+
+    reply.send({
+      success: true,
+      message: "Store deleted successfully.",
     });
   });
 }

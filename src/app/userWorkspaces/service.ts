@@ -82,5 +82,9 @@ export const getAllUserWorkspaces = async (fastify: any, attrs: any) => {
       integrations: true,
     },
   });
+  console.log(
+    "🚀 ~ file: service.ts:85 ~ getAllUserWorkspaces ~ user_workspaces:",
+    user_workspaces
+  );
   return user_workspaces || [];
 };

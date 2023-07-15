@@ -19,6 +19,19 @@ export function slackRoutes(fastify: FastifyInstance) {
       reply.send({ challenge });
     }
   );
+
+  // Create slack oauth callback
+  fastify.get(
+    "/api/v1/slack/oauth/callback",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      // @ts-ignore
+      const { code }: { code: string } = request.query || {};
+
+      console.log("slack oauth callback", request.query);
+
+      reply.send({ code });
+    }
+  );
 }
 
 export function slackEvents(fastify: FastifyInstance) {

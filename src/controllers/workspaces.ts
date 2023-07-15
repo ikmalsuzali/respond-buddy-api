@@ -1,7 +1,60 @@
 // @ts-nocheck
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { prisma } from "../prisma";
 
 export function workspaceRoutes(fastify: FastifyInstance) {
+  // Get workspace_integrations
+  fastify.get(
+    "/api/v1/workspace_integrations",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const {
+        search,
+        page,
+        limit,
+        store_types,
+        sortField,
+        sortOrder,
+      }: {
+        search: string;
+        page: number;
+        limit: number;
+        store_types: string[];
+        sortField: string;
+        sortOrder: string;
+      } = request.query || {};
+
+      const pageLimit = parseInt(limit);
+      const skip = (page - 1) * pageLimit;
+      let where = {
+        workspace: request?.token_metadata?.custom_metadata?.workspace_id,
+      };
+
+      let orderBy = {
+        ["created_at"]: sortOrder || "desc",
+      };
+
+      const data = await prisma.workspace_integrations.findMany({
+        take: pageLimit,
+        skip,
+        where,
+        orderBy,
+        include: {
+          integrations: true,
+        },
+      });
+
+      if (!data) {
+        throw new Error("Workspace integrations not found.");
+      }
+
+      reply.send({
+        success: true,
+        message: "Workspace integrations retrieved successfully.",
+        data: data,
+      });
+    }
+  );
+
   // Create a workspace
   fastify.post(
     "/api/v1/workspace",
@@ -12,7 +65,7 @@ export function workspaceRoutes(fastify: FastifyInstance) {
       if (!description) throw new Error("Description is required");
       if (!active) throw new Error("Active is required");
 
-      const workspace = await fastify.prisma.workspace.create({
+      const workspace = await prisma.workspace.create({
         data: {
           name,
           email,
@@ -31,7 +84,7 @@ export function workspaceRoutes(fastify: FastifyInstance) {
     "/api/v1/workspace",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { id, name, description, active } = request.body;
-      const workspace = await fastify.prisma.workspace.update({
+      const workspace = await prisma.workspace.update({
         where: {
           id: decryptJwt(request?.headers?.authorization),
         },
@@ -50,7 +103,7 @@ export function workspaceRoutes(fastify: FastifyInstance) {
     "/api/v1/workspace",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { id } = request.body;
-      const workspace = await fastify.prisma.workspace.delete({
+      const workspace = await prisma.workspace.delete({
         where: {
           id: decryptJwt(request?.headers?.authorization),
         },
@@ -61,10 +114,10 @@ export function workspaceRoutes(fastify: FastifyInstance) {
 
   // Get workspace by id
   fastify.get(
-    "/api/v1/workspace/get",
+    "/api/v1/workspace/:id",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { id } = request.body;
-      const workspace = await fastify.prisma.workspace.findUnique({
+      const workspace = await prisma.workspace.findUnique({
         where: {
           id,
         },
@@ -75,10 +128,19 @@ export function workspaceRoutes(fastify: FastifyInstance) {
 
   // Get all workspaces
   fastify.get(
-    "/api/v1/workspaces/get",
+    "/api/v1/integrations",
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const workspaces = await fastify.prisma.workspace.findMany();
-      reply.send(workspaces);
+      const data = await prisma.integrations.findMany();
+
+      if (!data) {
+        throw new Error("Connection types not found.");
+      }
+
+      reply.send({
+        success: true,
+        message: "Connection types retrieved successfully.",
+        data: data,
+      });
     }
   );
 }

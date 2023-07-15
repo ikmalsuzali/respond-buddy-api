@@ -5,8 +5,12 @@ import premiumWebsiteUrl from "../../json/websiteUrl.js";
 import { PDFLoader } from "langchain/document_loaders/fs/pdf";
 import { getOrCreateTag } from "../tags/service.ts";
 import { storeDocsToRedis } from "../redis/service.ts";
+import { storeS3File } from "../s3/service.ts";
 import { prisma } from "../../prisma";
+import { textLoader } from "../loader/service.ts";
 import sparkMD5 from "spark-md5";
+import os from "os";
+import fs from "fs/promises";
 
 // What is a store
 // A store is a collection of vectors that are related to each other.
@@ -35,6 +39,8 @@ export const saveStore = async (attrs: any) => {
     outputText,
     metadata,
     s3Id,
+    storeTypeId,
+    createdBy,
   } = attrs;
 
   if (hash) {
@@ -56,13 +62,17 @@ export const saveStore = async (attrs: any) => {
       metadata,
       hash,
       raw_s3_url: url,
-      s3_s3Tostore: s3Id,
+      s3: s3Id,
+      store_type: storeTypeId,
+      created_by: createdBy,
     },
   });
 
-  let redisKey = `${workspaceId}:${storeId}`;
+  let redisKey = `${workspaceId}:${store.id}`;
 
-  console.log("🚀 ~ file: service.ts:45 ~ saveStore ~ docs:", docs);
+  console.log("🚀 ~ file: service.ts:67 ~ saveStore ~ redisKey:", redisKey);
+
+  console.log("🚀 ~ file: service.ts:69 ~ saveStore ~ docs", docs);
 
   await storeDocsToRedis({
     docs,
@@ -229,31 +239,54 @@ export const computeFileMD5 = async (downloadUrl) => {
   return hash;
 };
 
-export const convertRawFileToDocs = async (text) => {
-  fs.writeFile(tempFilePath, text, async (err) => {
-    if (err) throw new Error(err);
+export const convertRawFileToDocs = async ({
+  text,
+  workspaceId,
+  filename,
+}: {
+  text: string;
+  workspaceId: string;
+  filename: string;
+}) => {
+  const tempFilePath = `${os.tmpdir()}/${filename || "temp_file"}.txt`;
+  let uploadResult = {};
 
-    // Read the local file content
-    fs.readFile(tempFilePath, async (err, data) => {
-      if (err) throw new Error(err);
+  await fs.writeFile(tempFilePath, text);
 
-      // Store text file
-      const storeResponse = await storeS3File({
-        // Hard code filename & toBuffer function below as these information need in store S3 file function
-        file: {
-          filename: tempFilePath,
-          toBuffer: () => data,
-        },
-        workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
-      });
-      s3Url = storeResponse?.url;
-    });
+  // Read the local file content
+  let data = await fs.readFile(tempFilePath);
+  console.log(data);
+
+  const fileSize = data.byteLength;
+  // Store text file
+  uploadResult = await storeS3File({
+    // Hard code filename & toBuffer function below as these information need in store S3 file function
+    file: {
+      filename: tempFilePath,
+      toBuffer: () => data,
+    },
+    workspaceId: workspaceId,
   });
 
-  return textLoader(tempFilePath);
+  console.log("upload result", uploadResult);
+
+  await prisma.s3.create({
+    data: {
+      workspace: workspaceId,
+      original_name: filename,
+      s3_name: uploadResult.newKey,
+      s3_url: uploadResult.url,
+      file_size: fileSize,
+    },
+  });
+
+  return {
+    docs: await textLoader(tempFilePath),
+    s3Url: uploadResult.url,
+  };
 };
 
-export const readExcel = async (excelTempFilePath) => {
+export const readExcel = async ({ excelTempFilePath, workspaceId }) => {
   fs.readFile(excelTempFilePath, async (err, data) => {
     if (err) throw new Error(err);
 
@@ -262,10 +295,43 @@ export const readExcel = async (excelTempFilePath) => {
         filename: excelTempFilePath,
         toBuffer: () => data,
       },
-      workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
+      workspaceId,
     });
     s3Url = storeResponse?.url;
   });
 
   return excelLoader(excelTempFilePath);
+};
+
+export const convertUrlToFilename = (url) => {
+  // Remove query parameters and fragments from the URL
+  const cleanUrl = url.split(/[?#]/)[0];
+
+  // Extract the pathname from the URL
+  const pathname = new URL(cleanUrl).pathname;
+
+  // Remove leading slashes from the pathname
+  const trimmedPathname = pathname.replace(/^\//, "");
+
+  // Replace special characters with underscores
+  const filename = trimmedPathname.replace(/[^\w-]/g, "_");
+
+  return filename;
+};
+
+export const countFilteredStores = async (workspace, storeType) => {
+  try {
+    const count = await prisma.store.count({
+      where: {
+        workspace: workspace,
+        store_type: storeType,
+      },
+    });
+
+    console.log("Count:", count);
+  } catch (error) {
+    console.error("Error:", error);
+  } finally {
+    await prisma.$disconnect();
+  }
 };
