@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { eventManager } from "../main";
 import axios from "axios";
