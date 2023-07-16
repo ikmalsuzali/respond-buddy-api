@@ -51,6 +51,7 @@ export function slackRoutes(fastify: FastifyInstance) {
             redirect_uri: `https://api.respondbuddy.com/api/v1/slack/oauth/callback?${workspace_id}&${user_id}&${integration_id}}`,
           }
         );
+        console.log("🚀 ~ file: slack.ts:54 ~ response:", response.data);
 
         const access_token = response.data.access_token;
 
@@ -63,7 +64,7 @@ export function slackRoutes(fastify: FastifyInstance) {
         );
         console.log(
           "🚀 ~ file: slack.ts:64 ~ teamInfoResponse:",
-          teamInfoResponse
+          teamInfoResponse.data
         );
         const teamName = teamInfoResponse.data.team?.name;
         const teamId = teamInfoResponse.data.team?.ic;
@@ -78,7 +79,7 @@ export function slackRoutes(fastify: FastifyInstance) {
         );
         console.log(
           "🚀 ~ file: slack.ts:76 ~ appInfoResponse:",
-          appInfoResponse
+          appInfoResponse.data
         );
         const appId = appInfoResponse.data.app_id;
 
