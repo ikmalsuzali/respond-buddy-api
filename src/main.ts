@@ -63,6 +63,12 @@ const main = async () => {
       SLACK_WEBHOOK_URL: {
         type: "string",
       },
+      SLACK_APP_CLIENT_ID: {
+        type: "string",
+      },
+      SLACK_APP_REDIRECT_URI: {
+        type: "string",
+      },
       SUPABASE_KEY: {
         type: "string",
       },
