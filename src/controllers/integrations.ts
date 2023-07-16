@@ -21,18 +21,7 @@ export function integrationRoutes(fastify: FastifyInstance) {
   fastify.post(
     "/api/v1/integration",
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const {
-        integration_id = "",
-        metadata = {
-          email: "",
-          password: "",
-          host: "",
-          imap_port: 993,
-          smtp_port: 465,
-          tls: true,
-          markSeen: true,
-        },
-      } = request.body || {};
+      const { integration_id = "", metadata = {} } = request.body || {};
 
       try {
         if (!integration_id) return new Error("Integration is required");
@@ -94,6 +83,7 @@ export function integrationRoutes(fastify: FastifyInstance) {
       }
     }
   );
+  
 
   // Update the workspace integration
   fastify.put(
