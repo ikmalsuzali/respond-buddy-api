@@ -2,6 +2,14 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { eventManager } from "../main";
 import axios from "axios";
+import { prisma } from "../prisma";
+import { validateObject } from "../helpers";
+
+import {
+  doesMessageContainBotMention,
+  sendEphemeralMessage,
+} from "../app/slack/service";
+
 // import { saveCustomer } from "../app/customer/service";
 
 export function slackRoutes(fastify: FastifyInstance) {
@@ -9,14 +17,91 @@ export function slackRoutes(fastify: FastifyInstance) {
     "/api/v1/slack/events",
     async (request: FastifyRequest, reply: FastifyReply) => {
       // @ts-ignore
+      console.dir(request.body, { depth: null });
       const {
         token,
         challenge,
         type,
+        event,
+        team_id,
       }: { token: string; challenge: string; type: string } =
         request.body || {};
 
-      console.log("slack events", request.body);
+      if (challenge) {
+        return reply.send({ challenge });
+      }
+
+      const workspaceIntegration =
+        await prisma.workspace_integrations.findFirst({
+          where: {
+            metadata: {
+              path: ["team_id"],
+              string_contains: team_id,
+            },
+          },
+        });
+
+      if (!workspaceIntegration) throw new Error("Workspace not found");
+
+      if (event.type === "message") {
+        const botMessage = doesMessageContainBotMention({
+          workspace: workspaceIntegration,
+          message: event.text,
+          threadTs: event.thread_ts,
+        });
+
+        if (
+          botMessage?.mentionedBot &&
+          event.user !== workspaceIntegration.metadata.bot_user_id
+        ) {
+
+
+          eventManager.emit("workflow", {
+            type: "slack",
+            workspace_integration_id: workspaceIntegration.id,
+            message: botMessage.cleanedText,
+            token: workspaceIntegration.metadata.token,
+            metaData: event,
+          });
+
+          // sendEphemeralMessage({
+          //   token: workspaceIntegration.metadata.token,
+          //   channel: event.channel,
+          //   user: event.user,
+          //   text: `Hello <@${event.user}>! :tada: I'm a bot created by <@${workspaceIntegration.metadata.bot_user_id}> working for ${workspaceIntegration.metadata.team_name}`,
+          // });
+        }
+      }
+
+      // try {
+      //   if (
+      //     event.type === "message" &&
+      //     event.user !== workspaceIntegration.metadata.bot_user_id
+      //   ) {
+      //     const { text, channel, user } = event;
+      //     console.log("🚀 ~ file: slack.ts:22 ~ event:", event);
+
+      //     await axios.post(
+      //       "https://slack.com/api/chat.postMessage",
+      //       {
+      //         channel,
+      //         text: `Hello <@${user}>! :tada: I'm a bot created by <@${workspaceIntegration.metadata.bot_user_id}> from <https://www.supabase.io|Supabase>.`,
+      //       },
+      //       {
+      //         headers: {
+      //           Authorization: `Bearer ${workspaceIntegration.metadata.token}`,
+      //         },
+      //       }
+      //     );
+      //   } else if (event.type === "pin_added") {
+      //     const { text, channel, user } = event;
+      //     console.log("🚀 ~ file: slack.ts:63 ~ event:", event);
+      //   }
+      // } catch (error) {
+      //   console.log(error);
+      // }
+
+      // console.log("slack events", request.body);
 
       reply.send({ challenge });
     }
@@ -39,51 +124,37 @@ export function slackRoutes(fastify: FastifyInstance) {
         integration_id: string;
       } = request.query || {};
 
-      console.log("slack oauth callback", request.query);
+      const params = new URLSearchParams();
+
+      let formData = {
+        client_id: fastify?.config.SLACK_APP_CLIENT_ID,
+        client_secret: fastify?.config.SLACK_APP_SECRET,
+        code: code,
+        redirect_uri: `${fastify?.config.SLACK_APP_REDIRECT_URI}?workspace_id=${workspace_id}&user_id=${user_id}&integration_id=${integration_id}`,
+      };
+
+      for (const key in formData) {
+        params.append(key, formData[key]);
+      }
 
       try {
         let response = await axios.post(
           "https://slack.com/api/oauth.v2.access",
+          params.toString(),
           {
-            client_id: fastify?.config.SLACK_CLIENT_ID,
-            client_secret: fastify?.config.SLACK_CLIENT_SECRET,
-            code: code,
-            redirect_uri: `https://api.respondbuddy.com/api/v1/slack/oauth/callback?${workspace_id}&${user_id}&${integration_id}}`,
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
           }
         );
-        console.log("🚀 ~ file: slack.ts:54 ~ response:", response.data);
 
-        const access_token = response.data.access_token;
+        const accessToken = response.data.access_token;
+        const teamId = response.data.team.id;
+        const teamName = response.data.team.name;
+        const userId = response.data.authed_user.id;
+        const botUserId = response.data.bot_user_id;
 
-        // Get team info
-        const teamInfoResponse = await axios.post(
-          "https://slack.com/api/team.info",
-          {
-            token: access_token,
-          }
-        );
-        console.log(
-          "🚀 ~ file: slack.ts:64 ~ teamInfoResponse:",
-          teamInfoResponse.data
-        );
-        const teamName = teamInfoResponse.data.team?.name;
-        const teamId = teamInfoResponse.data.team?.ic;
-
-        // Get app info
-
-        const appInfoResponse = await axios.post(
-          "https://slack.com/api/auth.test",
-          {
-            token: access_token,
-          }
-        );
-        console.log(
-          "🚀 ~ file: slack.ts:76 ~ appInfoResponse:",
-          appInfoResponse.data
-        );
-        const appId = appInfoResponse.data.app_id;
-
-        if (!integration_id || !appId || !teamName || !user_id) {
+        if (!integration_id || !teamName || !userId || !botUserId) {
           throw new Error("Error integrating");
         }
 
@@ -108,15 +179,14 @@ export function slackRoutes(fastify: FastifyInstance) {
           throw new Error("Integration already exists");
         }
 
-        console.log("🚀 ~ file: slack.ts:88 ~ integration:", integration);
-
         if (!integration) return new Error("Integration not found");
 
         let metadata = {
           team_id: teamId,
           team_name: teamName,
-          app_id: appId,
-          token: access_token,
+          user_id: userId,
+          bot_user_id: botUserId,
+          token: accessToken,
         };
 
         const errors = validateObject(metadata, integration?.meta_template);
@@ -127,8 +197,8 @@ export function slackRoutes(fastify: FastifyInstance) {
         const workspaceIntegration = await prisma.workspace_integrations.create(
           {
             data: {
-              integration_id: integration_id,
-              workspace_id: workspace_id,
+              integration: integration_id,
+              workspace: workspace_id,
               metadata: metadata,
             },
           }
@@ -136,6 +206,7 @@ export function slackRoutes(fastify: FastifyInstance) {
 
         reply.send("Successfully integrated, close window to get started");
       } catch (error) {
+        console.log(error);
         reply.send("Error integrating, try again later");
       }
     }

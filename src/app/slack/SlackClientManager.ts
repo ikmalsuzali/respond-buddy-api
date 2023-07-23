@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { App } from "@slack/bolt";
+import { App, ExpressReceiver } from "@slack/bolt";
 import { eventManager } from "../../main";
 
 export interface ClientConfig {
@@ -29,16 +29,24 @@ class SlackClientManager {
   async init(clientConfigs: ClientConfig[]) {
     console.log("Initializing Slack clients...", clientConfigs);
 
+    const receiver = new ExpressReceiver({
+      signingSecret: process.env.SLACK_APP_SIGNING_SECRET,
+      clientId: process.env.SLACK_APP_CLIENT_ID,
+      clientSecret: process.env.SLACK_APP_SECRET,
+    });
+
     try {
       clientConfigs.forEach(async (config) => {
-        console.log(config);
+        console.log(
+          "🚀 ~ file: SlackClientManager.ts:40 ~ SlackClientManager ~ clientConfigs.forEach ~ config:",
+          config
+        );
         this.clients[config.workspace_integration_id] = {
           app: new App({
             token: config.token,
-            signingSecret: config.signing_secret,
-            socketMode: true,
-            appToken: config.app_token,
+            signingSecret: process.env.SLACK_APP_SIGNING_SECRET,
             developerMode: true,
+            socketMode: false,
           }),
           workspace_integration_id: config.workspace_integration_id,
           team_id: config.teamId,

@@ -1,31 +1,22 @@
+// @ts-nocheck
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { eventManager, slackClientManager } from "../main";
-import { MemoryVectorStore } from "langchain/vectorstores/memory";
-import { triggerWorkflow } from "../app/workflow/service";
-import { getCustomer } from "../app/customer/service";
 import { getWorkspaceTags } from "../app/tags/service";
 import { getWorkspaceIntegration } from "../app/workspaceIntegration/service";
-import { tagSearch } from "../app/gpt/service";
 import { OpenAI } from "langchain/llms/openai";
-import { RetrievalQAChain } from "langchain/chains";
+import { SerpAPI, ChainTool } from "langchain/tools";
 import { getStoreByWorkspaceId } from "../app/store/service";
 import { getDocsFromRedis } from "../app/redis/service";
-import { OpenAIEmbeddings } from "langchain/embeddings/openai";
 import { Document } from "langchain/document";
+import { sendMessage } from "../app/slack/service";
+import { MultiRetrievalQAChain } from "langchain/chains";
+import { isObjectEmpty } from "../helpers";
+import { Calculator } from "langchain/tools/calculator";
+import { initializeAgentExecutorWithOptions } from "langchain/agents";
+import { prisma } from "../prisma";
 
 export function messageEvents(fastify: FastifyInstance) {
   eventManager.on("workflow", async (data: any) => {
-    // Get/Save customer information
-    // const customer = await getCustomer({
-    //   workspaceIntegrationId: data.workspace_integration_id,
-    //   userIdentity: data.user_identity,
-    // });
-    // if (!customer) {
-    //   // Save customer
-    //   await saveCustomer(data.data, data.workspace_integration_id);
-    // }
-    // Save customer message
-
     // thoughts
     // 1. Store the docs (store)
     // 2. Convert into a vector
@@ -37,10 +28,10 @@ export function messageEvents(fastify: FastifyInstance) {
       data.workspace_integration_id
     );
 
-    const allWorkspaceAndSystemTags = await getWorkspaceTags(
-      // @ts-ignore
-      workspaceIntegration?.workspace
-    );
+    // const allWorkspaceAndSystemTags = await getWorkspaceTags(
+    //   // @ts-ignore
+    //   workspaceIntegration?.workspace
+    // );
 
     // 2. Categorize the prompt
 
@@ -57,8 +48,6 @@ export function messageEvents(fastify: FastifyInstance) {
       workspaceId: workspaceIntegration!.workspace!,
     });
 
-    let foundDocs: Document<Record<string, any>>[] = [];
-
     try {
       const getDocsFromRedisInParallel: any = stores.map((store) => {
         return getDocsFromRedis({
@@ -71,40 +60,107 @@ export function messageEvents(fastify: FastifyInstance) {
 
       const results = await Promise.all(getDocsFromRedisInParallel);
 
-      console.log("results", results);
+      const cleanResults = results.filter((obj) => !isObjectEmpty(obj));
 
-      foundDocs = [...foundDocs, ...results?.[0]];
+      console.log("results", cleanResults);
+      const retrieverNames = cleanResults.map((result, index) => `index`);
+      const retrieverDescriptions = cleanResults.map(
+        (result) => "Used for all questions"
+      );
+      // @ts-ignore
+      const retrievers = cleanResults.map((result) =>
+        result.vectorStore.asRetriever()
+      );
+
+      const multiRetrievalQAChain = MultiRetrievalQAChain.fromLLMAndRetrievers(
+        new OpenAI(),
+        {
+          retrieverNames,
+          retrieverDescriptions,
+          retrievers,
+          // retrievalQAChainOpts: {
+          //   returnSourceDocuments: true,
+          // },
+        }
+      );
+
+      let chain = await multiRetrievalQAChain.call({
+        input: data.message,
+      });
+      console.log(
+        "🚀 ~ file: message.ts:104 ~ eventManager.on ~ response:",
+        chain
+      );
+
+      // const knowledgeTool = new ChainTool({
+      //   name: "Knowledge Chain",
+      //   description: "Used for custom questions",
+      //   // @ts-ignore
+      //   chain: chain,
+      //   returnDirect: true,
+      // });
+
+      // const tools = [new Calculator(), knowledgeTool];
+
+      // const executor = await initializeAgentExecutorWithOptions(
+      //   tools,
+      //   new OpenAI(),
+      //   {
+      //     agentType: "zero-shot-react-description",
+      //     verbose: true,
+      //   }
+      // );
+
+      // console.log("executor", executor);
+
+      // const result = await executor.call({
+      //   input: data.message,
+      // });
+
+      // console.log(
+      //   "🚀 ~ file: message.ts:128 ~ eventManager.on ~ result:",
+      //   result
+      // );
+
+      if (data.type === "slack") {
+        // console.log("🚀 ~ file: message.ts:96 ~ eventManager.on ~ res", res);
+        // console.log("🚀 ~ file: message.ts:96 ~ eventManager.on ~ data", data);
+        await sendMessage({
+          token: data.token,
+          channel: data.metaData.channel,
+          text:
+            chain.text || chain.result || "Sorry, I did not understand that.",
+          tsThread: data.metaData.ts,
+        });
+      }
+
+      // foundDocs = [...foundDocs, ...results?.[0]];
     } catch (error) {
       console.log(error);
     }
 
-    console.log(
-      "🚀 ~ file: message.ts:70 ~ eventManager.on ~ foundDocs:",
-      foundDocs
-    );
+    // console.log(
+    //   "🚀 ~ file: message.ts:70 ~ eventManager.on ~ foundDocs:",
+    //   foundDocs
+    // );
 
-    const vectorStore = await MemoryVectorStore.fromDocuments(
-      foundDocs,
-      new OpenAIEmbeddings()
-    );
+    // const vectorStore = await RedisVectorStore.fromDocuments(
+    //   foundDocs,
+    //   new OpenAIEmbeddings(),
+    //   {
+    //     // @ts-ignore
+    //     redisClient,
+    //     indexName: "docs",
+    //   }
+    // );
 
-    const model = new OpenAI({});
+    // const model = new OpenAI({});
 
-    const chain = RetrievalQAChain.fromLLM(model, vectorStore.asRetriever());
+    // const chain = RetrievalQAChain.fromLLM(model, vectorStore.asRetriever());
 
-    const res = await chain.call({
-      query: data.message,
-    });
-
-    if (data.type === "slack") {
-      slackClientManager.sendMessage({
-        workspace_integration_id: data.workspace_integration_id,
-        channel: data?.metaData.channel,
-        message: res.text,
-        thread_ts: data?.metaData.thread_ts,
-        ts: data?.metaData.ts,
-      });
-    }
+    // const res = await chain.call({
+    //   query: data.message,
+    // });
 
     // 3. Get the vector stores related
     // 4. Search for the similarities in the vector stores
@@ -121,13 +177,56 @@ export function messageEvents(fastify: FastifyInstance) {
     // Save response message
     // Follow rules to send message
   });
+
+  eventManager.on("save-message", async (data: any) => {
+    let customer = null;
+    // Get/Save customer information
+    customer = await getCustomer({
+      workspaceIntegrationId: data.workspace_integration_id,
+      userIdentity: data.user_identity,
+    });
+    if (!customer) {
+      // Save customer
+      customer = await saveCustomer(data.data, data.workspace_integration_id);
+    }
+  });
+
+  eventManager.on("save-customer", async (data: any) => {});
 }
 
 export function messageRoutes(fastify: FastifyInstance) {
   fastify.post(
     "/api/v1/message",
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const body = request.body;
+      eventManager.emit("workflow", {
+        type: "app",
+
+        workspace_integration_id:
+          request?.token_metadata?.custom_metadata?.workspace_id,
+        user_id: request?.token_metadata?.custom_metadata?.user_id,
+        message: botMessage.cleanedText,
+        token: workspaceIntegration.metadata.token,
+        metaData: event,
+      });
     }
   );
+
+  fastify.get("/api/v1/messages/:store_id", async (request, reply) => {
+    const { store_id } = request.params || {};
+
+    try {
+      const messages = await prisma.messages.findMany({
+        where: { store_id },
+        orderBy: [
+          { other_messages: "desc" }, // Sort by other_messages in descending order
+          { created_at: "asc" }, // Sort by created_at in ascending order
+        ],
+      });
+      reply.send({ success: true, messages });
+    } catch (err) {
+      reply
+        .status(500)
+        .send({ success: false, message: "Failed to retrieve messages." });
+    }
+  });
 }

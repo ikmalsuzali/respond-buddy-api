@@ -199,6 +199,10 @@ export const addSitemapPathToBaseUrl = async (
   return `${base}${sitemapPath}`;
 };
 
+export const isObjectEmpty = (obj: any) => {
+  return Object.keys(obj).length === 0;
+}
+
 const parseStringPromise = (xmlData: string) => {
   return new Promise((resolve, reject) => {
     parseString(xmlData, (error: any, result: any) => {

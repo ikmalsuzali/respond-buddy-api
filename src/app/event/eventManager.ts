@@ -8,24 +8,6 @@ class EventManager {
   }
 
   on(eventName: string, callback) {
-    // console.log(
-    //   "🚀 ~ file: eventManager.ts:11 ~ EventManager ~ on ~ eventName: string, callback:",
-    //   { eventName: string, callback }
-    // );
-    // if (
-    //   eventName === "workflow" &&
-    //   callback.workspace_integration_id &&
-    //   callback.message
-    // ) {
-    //   triggerWorkflow(callback);
-    // }
-    // if (
-    //   eventName === "response" &&
-    //   callback.workspace_integration_id &&
-    //   callback.message
-    // ) {
-    //   triggerResponse(callback);
-    // }
     this.emitter.on(eventName, callback);
   }
 

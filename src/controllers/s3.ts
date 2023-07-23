@@ -7,6 +7,7 @@ import { prisma } from "../prisma";
 export function s3Routes(fastify: FastifyInstance) {
   fastify.post("/api/v1/file/upload", async (request, reply) => {
     try {
+      console.log("triggered", request.body.file);
       const file = await request.body.file;
 
       const fileSize = file?.file?.bytesRead || file?.byteLength || file.size;

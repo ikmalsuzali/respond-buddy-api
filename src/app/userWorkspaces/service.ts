@@ -77,6 +77,7 @@ export const getAllUserWorkspaces = async (fastify: any, attrs: any) => {
       integrations: {
         name: integration_name,
       },
+      is_deleted: false,
     },
     include: {
       integrations: true,

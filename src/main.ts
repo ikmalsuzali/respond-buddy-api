@@ -19,6 +19,8 @@ import SlackClientManager, {
   ClientConfig,
 } from "./app/slack/SlackClientManager";
 import { S3 } from "@aws-sdk/client-s3";
+import { RedisVectorStore } from "langchain/vectorstores/redis";
+import { OpenAIEmbeddings } from "langchain/embeddings/openai";
 
 let slack = null;
 let logger = null;
@@ -68,6 +70,12 @@ const main = async () => {
         type: "string",
       },
       SLACK_APP_CLIENT_ID: {
+        type: "string",
+      },
+      SLACK_APP_SECRET: {
+        type: "string",
+      },
+      SLACK_APP_SIGNING_SECRET: {
         type: "string",
       },
       SLACK_APP_REDIRECT_URI: {
@@ -209,6 +217,13 @@ const main = async () => {
   try {
     // @ts-ignore
     await server.listen({ port: process.env.PORT || 8080, host: "0.0.0.0" });
+  } catch (err) {
+    console.log(err);
+    await prisma.$disconnect();
+    process.exit(1);
+  }
+
+  try {
     const workspaceEmailIntegrations = await getAllUserWorkspaces(server, {
       integration_name: "email",
     });
@@ -218,26 +233,23 @@ const main = async () => {
 
     console.log(workspaceSlackIntegrations);
     // mailListenerManager.init(workspaceEmailIntegrations);
-    const mappedWorkspaceSlackIntegrations: ClientConfig[] =
-      workspaceSlackIntegrations.map((workspaceSlackIntegration) => {
-        return {
-          workspace_integration_id: workspaceSlackIntegration.id,
-          // @ts-ignore
-          token: workspaceSlackIntegration?.metadata?.token,
-          // @ts-ignore
-          signing_secret: workspaceSlackIntegration?.metadata?.signing_secret,
-          // @ts-ignore
-          team_id: workspaceSlackIntegration?.metadata?.team_id,
-          // @ts-ignore
-          app_token: workspaceSlackIntegration?.metadata?.app_token,
-        };
-      });
+    // @ts-ignore
+    // const mappedWorkspaceSlackIntegrations: ClientConfig[] =
+    //   workspaceSlackIntegrations.map((workspaceSlackIntegration) => {
+    //     return {
+    //       workspace_integration_id: workspaceSlackIntegration.id,
+    //       // @ts-ignore
+    //       token: workspaceSlackIntegration?.metadata?.token,
+    //       // @ts-ignore
+    //       signing_secret: process.env.SLACK_APP_SECRET,
+    //       // @ts-ignore
+    //       team_id: workspaceSlackIntegration?.metadata?.team_id,
+    //     };
+    //   });
 
-    await slackClientManager.init(mappedWorkspaceSlackIntegrations);
-  } catch (err) {
-    console.log(err);
-    await prisma.$disconnect();
-    process.exit(1);
+    // await slackClientManager.init(mappedWorkspaceSlackIntegrations);
+  } catch (error) {
+    console.log(error);
   }
 
   logger = server.log;

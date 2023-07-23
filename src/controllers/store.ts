@@ -93,23 +93,20 @@ export function storeRoutes(fastify: FastifyInstance) {
     const results = await Promise.all(getDocsFromRedisInParallel);
     console.log("🚀 ~ file: store.ts:70 ~ fastify.get ~ results:", results);
     for (const result of results) {
-      console.log(
-        "🚀 ~ file: store.ts:72 ~ fastify.get ~ result:",
-        result?.[0]?.[0]?.metadata
-      );
-      if (
-        result?.[0]?.[0]?.metadata?.workspace_id &&
-        result?.[0]?.[0]?.metadata?.store_id
-      ) {
-        keys[
-          `${result?.[0]?.[0]?.metadata?.workspace_id}:${result?.[0]?.[0]?.metadata?.store_id}`
-        ] = {
-          docs: result,
-          store_data: stores.find(
-            (store) => store.id === result?.[0]?.[0]?.metadata?.store_id
-          ),
-        };
-      }
+      console.log("🚀 ~ file: store.ts:72 ~ fastify.get ~ result:", result);
+      // if (
+      //   result?.[0]?.[0]?.metadata?.workspace_id &&
+      //   result?.[0]?.[0]?.metadata?.store_id
+      // ) {
+      //   keys[
+      //     `${result?.[0]?.[0]?.metadata?.workspace_id}:${result?.[0]?.[0]?.metadata?.store_id}`
+      //   ] = {
+      //     docs: result,
+      //     store_data: stores.find(
+      //       (store) => store.id === result?.[0]?.[0]?.metadata?.store_id
+      //     ),
+      //   };
+      // }
     }
 
     console.log("🚀 ~ file: store.ts:74 ~ fastify.get ~ keys:", keys);

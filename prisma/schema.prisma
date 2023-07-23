@@ -17,6 +17,7 @@ model users {
   about_me        String?           @db.VarChar
   user_id         String?           @db.Uuid
   username        String?           @db.VarChar
+  messages        messages[]
   s3              s3[]
   store           store[]
   user_workspaces user_workspaces[]
@@ -104,6 +105,7 @@ model workspace_integrations {
   created_at                   DateTime?                      @default(now()) @db.Timestamptz(6)
   metadata                     Json?
   status                       String?                        @db.VarChar
+  is_deleted                   Boolean?                       @default(false)
   integrations                 integrations?                  @relation(fields: [integration], references: [id], onDelete: NoAction, onUpdate: NoAction)
   workspaces                   workspaces?                    @relation(fields: [workspace], references: [id], onDelete: NoAction, onUpdate: NoAction)
   response                     response[]
@@ -198,6 +200,7 @@ model store {
   s3_s3Tostore s3?          @relation(fields: [s3], references: [id], onUpdate: NoAction)
   store_types  store_types? @relation(fields: [store_type], references: [id], onUpdate: NoAction)
   workspaces   workspaces?  @relation(fields: [workspace], references: [id], onUpdate: NoAction)
+  messages     messages[]
   store_tags   store_tags[]
 }
 
@@ -233,4 +236,19 @@ model s3 {
   users         users?      @relation(fields: [created_by], references: [id], onUpdate: NoAction)
   workspaces    workspaces? @relation(fields: [workspace], references: [id], onDelete: NoAction, onUpdate: NoAction)
   store         store[]
+}
+
+model messages {
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at      DateTime?  @default(now()) @db.Timestamptz(6)
+  created_by      String?    @db.Uuid
+  store_id        String?    @db.Uuid
+  content         String?    @db.VarChar
+  gpt_message     String?    @db.VarChar
+  status          String?    @db.VarChar
+  orignal_message String?   @db.Uuid
+  users           users?     @relation(fields: [created_by], references: [id], onUpdate: NoAction)
+  messages        messages?  @relation("messagesTomessages", fields: [orignal_message], references: [id], onUpdate: NoAction)
+  store           store?     @relation(fields: [store_id], references: [id], onUpdate: NoAction)
+  other_messages  messages[] @relation("messagesTomessages")
 }

@@ -31,32 +31,32 @@ export const getCustomer = async ({
   return customer;
 };
 
-// export const saveCustomer = async ({
-//   email,
-//   workspace,
-//   metadata,
-// }: {
-//   email: string;
-//   workspace: string;
-//   metadata?: any | null | undefined;
-// }) => {
-//   // @ts-nocheck
-//   const customer = await prisma.customers.create({
-//     data: {
-//       email,
-//       workspace,
-//       metadata: {
-//         ...metadata,
-//         slack_id: metadata?.user?.id,
-//         slack_username: metadata?.user?.name,
-//       },
-//     },
-//   });
+export const saveCustomer = async ({
+  email,
+  workspace,
+  metadata,
+}: {
+  email: string;
+  workspace: string;
+  metadata?: any | null | undefined;
+}) => {
+  // @ts-nocheck
+  const customer = await prisma.customers.create({
+    data: {
+      email,
+      workspace,
+      metadata: {
+        ...metadata,
+        slack_id: metadata?.user?.id,
+        slack_username: metadata?.user?.name,
+      },
+    },
+  });
 
-//   if (!customer) throw new Error("Unable to create customer");
+  if (!customer) throw new Error("Unable to create customer");
 
-//   return customer;
-// };
+  return customer;
+};
 
 export const getSlackCustomer = async ({ userInfo }: { userInfo: any }) => {
   return {
