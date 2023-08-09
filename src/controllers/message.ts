@@ -1,142 +1,30 @@
 // @ts-nocheck
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { eventManager, slackClientManager } from "../main";
-import { getWorkspaceTags } from "../app/tags/service";
-import { getWorkspaceIntegration } from "../app/workspaceIntegration/service";
-import { OpenAI } from "langchain/llms/openai";
-import { SerpAPI, ChainTool } from "langchain/tools";
-import { getStoreByWorkspaceId } from "../app/store/service";
-import { getDocsFromRedis } from "../app/redis/service";
-import { Document } from "langchain/document";
-import { sendMessage } from "../app/slack/service";
-import { MultiRetrievalQAChain } from "langchain/chains";
-import { isObjectEmpty } from "../helpers";
-import { Calculator } from "langchain/tools/calculator";
-import { initializeAgentExecutorWithOptions } from "langchain/agents";
+import { eventManager } from "../main";
 import { prisma } from "../prisma";
+import {
+  processBasicMessage,
+  processMessage,
+  saveMessage,
+} from "../app/message/service";
+import { getCustomer, saveCustomer } from "../app/customer/service";
 
 export function messageEvents(fastify: FastifyInstance) {
   eventManager.on("workflow", async (data: any) => {
-    // thoughts
-    // 1. Store the docs (store)
-    // 2. Convert into a vector
-    // 3. Attach a tag to the stored vector
-
-    // Upon message received:
-    // 1. Get the tags related
-    const workspaceIntegration = await getWorkspaceIntegration(
-      data.workspace_integration_id
-    );
-
-    // const allWorkspaceAndSystemTags = await getWorkspaceTags(
-    //   // @ts-ignore
-    //   workspaceIntegration?.workspace
-    // );
-
-    // 2. Categorize the prompt
-
-    // try {
-    //   const matchedTags = await tagSearch(
-    //     allWorkspaceAndSystemTags,
-    //     data.message
-    //   );
-    // } catch {
-    //   console.log("No tags found");
-    // }
-
-    const stores = await getStoreByWorkspaceId({
-      workspaceId: workspaceIntegration!.workspace!,
+    const chain = processMessage({
+      message: data.message,
+      workspaceId: data.workspaceId,
     });
 
-    try {
-      const getDocsFromRedisInParallel: any = stores.map((store) => {
-        return getDocsFromRedis({
-          workspaceId: workspaceIntegration!.workspace,
-          storeId: store.id,
-          message: data.message,
-          similarityCount: 1,
-        });
+    if (data.type === "slack") {
+      // console.log("🚀 ~ file: message.ts:96 ~ eventManager.on ~ res", res);
+      // console.log("🚀 ~ file: message.ts:96 ~ eventManager.on ~ data", data);
+      await sendMessage({
+        token: data.token,
+        channel: data.metaData.channel,
+        text: chain.text || chain.result || "Sorry, I couldn't find anything",
+        tsThread: data.metaData.ts,
       });
-
-      const results = await Promise.all(getDocsFromRedisInParallel);
-
-      const cleanResults = results.filter((obj) => !isObjectEmpty(obj));
-
-      console.log("results", cleanResults);
-      const retrieverNames = cleanResults.map((result, index) => `index`);
-      const retrieverDescriptions = cleanResults.map(
-        (result) => "Used for all questions"
-      );
-      // @ts-ignore
-      const retrievers = cleanResults.map((result) =>
-        result.vectorStore.asRetriever()
-      );
-
-      const multiRetrievalQAChain = MultiRetrievalQAChain.fromLLMAndRetrievers(
-        new OpenAI(),
-        {
-          retrieverNames,
-          retrieverDescriptions,
-          retrievers,
-          // retrievalQAChainOpts: {
-          //   returnSourceDocuments: true,
-          // },
-        }
-      );
-
-      let chain = await multiRetrievalQAChain.call({
-        input: data.message,
-      });
-      console.log(
-        "🚀 ~ file: message.ts:104 ~ eventManager.on ~ response:",
-        chain
-      );
-
-      // const knowledgeTool = new ChainTool({
-      //   name: "Knowledge Chain",
-      //   description: "Used for custom questions",
-      //   // @ts-ignore
-      //   chain: chain,
-      //   returnDirect: true,
-      // });
-
-      // const tools = [new Calculator(), knowledgeTool];
-
-      // const executor = await initializeAgentExecutorWithOptions(
-      //   tools,
-      //   new OpenAI(),
-      //   {
-      //     agentType: "zero-shot-react-description",
-      //     verbose: true,
-      //   }
-      // );
-
-      // console.log("executor", executor);
-
-      // const result = await executor.call({
-      //   input: data.message,
-      // });
-
-      // console.log(
-      //   "🚀 ~ file: message.ts:128 ~ eventManager.on ~ result:",
-      //   result
-      // );
-
-      if (data.type === "slack") {
-        // console.log("🚀 ~ file: message.ts:96 ~ eventManager.on ~ res", res);
-        // console.log("🚀 ~ file: message.ts:96 ~ eventManager.on ~ data", data);
-        await sendMessage({
-          token: data.token,
-          channel: data.metaData.channel,
-          text:
-            chain.text || chain.result || "Sorry, I did not understand that.",
-          tsThread: data.metaData.ts,
-        });
-      }
-
-      // foundDocs = [...foundDocs, ...results?.[0]];
-    } catch (error) {
-      console.log(error);
     }
 
     // console.log(
@@ -178,18 +66,41 @@ export function messageEvents(fastify: FastifyInstance) {
     // Follow rules to send message
   });
 
-  eventManager.on("save-message", async (data: any) => {
-    let customer = null;
-    // Get/Save customer information
-    customer = await getCustomer({
-      workspaceIntegrationId: data.workspace_integration_id,
-      userIdentity: data.user_identity,
-    });
-    if (!customer) {
-      // Save customer
-      customer = await saveCustomer(data.data, data.workspace_integration_id);
+  eventManager.on(
+    "save-message",
+    async ({
+      workspaceId,
+      userIdentity,
+      storeId,
+    }): {
+      workspaceId: string;
+      userIdentity: string;
+      type: string;
+      storeId?: string | null;
+    } => {
+      let customer = null;
+      // Get/Save customer information
+      if (userIdentity) {
+        customer = await getCustomer({
+          workspaceId: workspaceId,
+          userIdentity: userIdentity,
+        });
+        if (!customer) {
+          // Save customer
+          customer = await saveCustomer({
+            workspaceId: workspaceId,
+          });
+        }
+      }
+
+      saveMessage({
+        message: message,
+        customerId: customer?.id || null,
+        storeId: storeId,
+        originalMessageId: originalMessageId,
+      });
     }
-  });
+  );
 
   eventManager.on("save-customer", async (data: any) => {});
 }
@@ -198,32 +109,116 @@ export function messageRoutes(fastify: FastifyInstance) {
   fastify.post(
     "/api/v1/message",
     async (request: FastifyRequest, reply: FastifyReply) => {
-      eventManager.emit("workflow", {
-        type: "app",
+      const { message, store_id, user_identity } = request.body || {};
 
-        workspace_integration_id:
-          request?.token_metadata?.custom_metadata?.workspace_id,
-        user_id: request?.token_metadata?.custom_metadata?.user_id,
-        message: botMessage.cleanedText,
-        token: workspaceIntegration.metadata.token,
-        metaData: event,
+      let customer = null;
+      let userIdentity =
+        user_identity || request?.token_metadata?.custom_metadata?.user_id;
+      // Get/Save customer information
+      if (userIdentity) {
+        customer = await getCustomer({
+          workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
+          userIdentity,
+        });
+        if (!customer) {
+          // Save customer
+          customer = await saveCustomer({
+            workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
+          });
+        }
+      }
+
+      const userMessage = await saveMessage({
+        message: message,
+        customerId: customer?.id,
+        storeId: store_id,
+      });
+
+      const response = await processMessage({
+        message: message,
+        workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
+        storeId: store_id,
+      });
+
+      console.log("🚀 ~ file: message.ts:139 ~ response:", response);
+
+      await saveMessage({
+        message: response.text || response.result,
+        storeId: store_id,
+        originalMessageId: userMessage.id,
+      });
+
+      reply.send({
+        success: true,
+        data: {
+          message: response.text || response.result,
+          customer: customer?.id,
+        },
       });
     }
   );
 
-  fastify.get("/api/v1/messages/:store_id", async (request, reply) => {
+  fastify.post("/api/v1/message/free", async (request, reply) => {
+    const { message, user_id } = request.body || {};
+
+    try {
+      let customer = null;
+      let randomUserIdentity = user_id;
+      // Get/Save customer information
+      if (randomUserIdentity) {
+        customer = await getCustomer({
+          randomUserIdentity,
+        });
+        if (!customer) {
+          // Save customer
+          customer = await saveCustomer({
+            randomUserId: randomUserIdentity,
+          });
+        }
+      }
+
+      const userMessage = await saveMessage({
+        message: message,
+        customerId: customer?.id,
+      });
+
+      console.log("userMessage", userMessage);
+
+      const response = await processBasicMessage({
+        message: message,
+        userId: customer?.id,
+      });
+
+      await saveMessage({
+        message: response?.text || response.result,
+        originalMessageId: userMessage.id,
+      });
+
+      reply.send({
+        success: true,
+        data: {
+          message: response.text || response.result,
+          customer: customer?.id,
+        },
+      });
+    } catch (error) {
+      console.log(error);
+    }
+  });
+
+  fastify.get("/api/v1/message/:store_id", async (request, reply) => {
     const { store_id } = request.params || {};
 
     try {
       const messages = await prisma.messages.findMany({
-        where: { store_id },
+        where: { store: store_id },
         orderBy: [
-          { other_messages: "desc" }, // Sort by other_messages in descending order
           { created_at: "asc" }, // Sort by created_at in ascending order
         ],
       });
       reply.send({ success: true, messages });
     } catch (err) {
+      console.log(err);
       reply
         .status(500)
         .send({ success: false, message: "Failed to retrieve messages." });

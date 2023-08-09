@@ -9,6 +9,7 @@ import { storeRoutes } from "./controllers/store";
 import { s3Routes } from "./controllers/s3";
 import { discordRoutes } from "./controllers/discord";
 import { websiteRoutes } from "./controllers/website";
+import { messageRoutes } from "./controllers/message";
 
 export function registerRoutes(fastify: FastifyInstance) {
   stripeRoutes(fastify);
@@ -21,4 +22,5 @@ export function registerRoutes(fastify: FastifyInstance) {
   s3Routes(fastify);
   discordRoutes(fastify);
   websiteRoutes(fastify);
+  messageRoutes(fastify);
 }

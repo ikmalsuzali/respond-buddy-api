@@ -177,13 +177,24 @@ export const getTextByWebsiteURL = async (url: string) => {
 
 export const getStoreByWorkspaceId = async ({
   workspaceId,
+  storeId,
 }: {
   workspaceId: string | null;
+  storeId?: string | null;
 }) => {
+  let whereClause = {
+    workspace: workspaceId,
+  };
+
+  if (storeId) {
+    whereClause = {
+      ...whereClause,
+      id: storeId,
+    };
+  }
+
   const stores = await prisma.store.findMany({
-    where: {
-      workspace: workspaceId,
-    },
+    where: whereClause,
   });
 
   return stores;

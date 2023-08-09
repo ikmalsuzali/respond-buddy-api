@@ -58,7 +58,7 @@ export function slackRoutes(fastify: FastifyInstance) {
 
           eventManager.emit("workflow", {
             type: "slack",
-            workspace_integration_id: workspaceIntegration.id,
+            workspaceId: workspaceIntegration.workspace_id,
             message: botMessage.cleanedText,
             token: workspaceIntegration.metadata.token,
             metaData: event,

@@ -227,11 +227,11 @@ const main = async () => {
     const workspaceEmailIntegrations = await getAllUserWorkspaces(server, {
       integration_name: "email",
     });
-    const workspaceSlackIntegrations = await getAllUserWorkspaces(server, {
-      integration_name: "Slack",
-    });
+    // const workspaceSlackIntegrations = await getAllUserWorkspaces(server, {
+    //   integration_name: "Slack",
+    // });
 
-    console.log(workspaceSlackIntegrations);
+    // console.log(workspaceSlackIntegrations);
     // mailListenerManager.init(workspaceEmailIntegrations);
     // @ts-ignore
     // const mappedWorkspaceSlackIntegrations: ClientConfig[] =
