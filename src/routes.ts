@@ -10,6 +10,8 @@ import { s3Routes } from "./controllers/s3";
 import { discordRoutes } from "./controllers/discord";
 import { websiteRoutes } from "./controllers/website";
 import { messageRoutes } from "./controllers/message";
+import { tagsRoutes } from "./controllers/tags";
+import { userRoutes } from "./controllers/users";
 
 export function registerRoutes(fastify: FastifyInstance) {
   stripeRoutes(fastify);
@@ -23,4 +25,6 @@ export function registerRoutes(fastify: FastifyInstance) {
   discordRoutes(fastify);
   websiteRoutes(fastify);
   messageRoutes(fastify);
+  tagsRoutes(fastify);
+  userRoutes(fastify);
 }

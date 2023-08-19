@@ -237,4 +237,73 @@ export function authRoutes(fastify: FastifyInstance) {
       reply.code(200).send({ emails: validEmails, error: errors });
     }
   );
+
+  // Update password
+  // fastify.post(
+  //   "/api/v1/update-password",
+  //   async (request: FastifyRequest, reply: FastifyReply) => {
+  //     const { current_password, password, confirm_password } =
+  //       request.body || {};
+
+  //     if (!current_password) throw new Error("Current password is required");
+  //     if (!password) throw new Error("Password is required");
+  //     if (!confirm_password) throw new Error("Confirm password is required");
+
+  //     // check current password
+
+  //     // Get user from Supabase by email
+  //     const { data: user, error } = await supabase
+  //       .from("users")
+  //       .select("*")
+  //       .eq("email", email)
+  //       .single();
+
+  //     if (error || !user) {
+  //       return reply.status(400).send({ error: "User not found!" });
+  //     }
+
+  //     const isValidPassword = await bcrypt.compare(
+  //       currentPassword,
+  //       user.encrypted_password
+  //     );
+  //     if (!isValidPassword) {
+  //       return reply.status(400).send({ error: "Invalid current password!" });
+  //     }
+
+  //     if (password !== confirm_password) {
+  //       throw new Error("Passwords do not match");
+  //     }
+
+  //     const { user, session, error } = await supabase.auth.update({
+  //       password,
+  //     });
+
+  //     if (error) {
+  //       throw new Error(error.message);
+  //     }
+
+  //     reply.code(200).send({ user, session });
+  //   }
+  // );
+
+  // Reset password
+  fastify.post(
+    "/api/v1/auth/reset-password",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const user = await prisma.users.findUnique({
+        where: {
+          id: request?.token_metadata?.custom_metadata?.user_id,
+        },
+      });
+
+      const { data, error } = await supabase.auth.api.resetPasswordForEmail(
+        user?.email,
+        { redirectTo: `${fastify.config.BASE_URL}/update-password` }
+      );
+
+      reply
+        .code(200)
+        .send({ data, message: "Email sent with password reset request" });
+    }
+  );
 }

@@ -75,17 +75,19 @@ model rule_tags {
 }
 
 model tags {
-  id                  String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  created_at          DateTime?     @default(now()) @db.Timestamptz(6)
-  name                String?       @db.VarChar
-  workspace           String?       @db.Uuid
-  is_system_tag       Boolean?      @default(true)
-  description         String?       @default("") @db.VarChar
-  ai_default_response String?       @db.VarChar
-  workspaces          workspaces?   @relation(fields: [workspace], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  rule_tags           rule_tags[]
-  store_tags          store_tags[]
-  tag_aliases         tag_aliases[]
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at       DateTime?     @default(now()) @db.Timestamptz(6)
+  name             String?       @db.VarChar
+  workspace        String?       @db.Uuid
+  is_system_tag    Boolean?      @default(true)
+  used_description String?       @default("") @db.VarChar
+  ai_template      String?       @db.VarChar
+  key              String?       @db.VarChar
+  command_type     String?       @db.VarChar
+  workspaces       workspaces?   @relation(fields: [workspace], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  rule_tags        rule_tags[]
+  store_tags       store_tags[]
+  tag_aliases      tag_aliases[]
 }
 
 model user_workspaces {

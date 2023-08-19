@@ -2,6 +2,7 @@ import {
   ConversationChain,
   LLMChain,
   MultiRetrievalQAChain,
+  MultiRouteChain,
 } from "langchain/chains";
 import { isObjectEmpty } from "../../helpers";
 import { getDocsFromRedis } from "../redis/service";
@@ -115,6 +116,63 @@ export const processBasicMessage = async ({
   userId: string;
 }) => {
   if (!message) throw new Error("Message is empty");
+
+  // Check how messages sent based on userId
+  // If message >= 10, return message reached max limit for the day
+
+  try {
+    // const prompt = PromptTemplate.fromTemplate(message);
+
+    // const chain = new LLMChain({
+    //   llm: new OpenAI({
+    //     // temperature: 0.1,
+    //   }),
+    //   prompt,
+    // });
+
+    const response = await multiPromptChain().call({
+      input: message,
+    });
+    console.log(
+      "🚀 ~ file: service.ts:128 ~ runMultiPromptChain ~ response",
+      response
+    );
+
+    console.log(response);
+
+    if (!response) {
+      return {
+        result: "Sorry, nothing I can find here",
+      };
+    }
+
+    return {
+      // @ts-ignore
+      result: response.text,
+    };
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+export const processBasicMessageV2 = async ({
+  message,
+  userId,
+}: {
+  message: string;
+  userId: string;
+}) => {
+  if (!message) throw new Error("Message is empty");
+
+  // Use embeddings to find closest match
+  // If match is found, return match key and id
+  // Find key in database
+  // Find custom function to run
+  // If match is not found, use GPT to generate response
+
+  // const response = await MultiRouteChain.call({
+  //   defaultChain: "default",
+  // });
 
   // Check how messages sent based on userId
   // If message >= 10, return message reached max limit for the day

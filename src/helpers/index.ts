@@ -26,6 +26,30 @@ export const getValidEmails = (str: string | undefined) => {
   return validEmailList;
 };
 
+export const nameToKey = (name: string | undefined) => {
+  if (!name || typeof name !== "string") {
+    return "";
+  }
+
+  // Convert to lowercase
+  let key = name.toLowerCase();
+
+  // Replace spaces with hyphens
+  key = key.replace(/\s+/g, "-");
+
+  // Remove special characters
+  key = key.replace(/[^a-z0-9-]/g, "");
+
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  const randomSuffix = Array.from({ length: 4 })
+    .map(() => chars[Math.floor(Math.random() * chars.length)])
+    .join("");
+
+  key += `-${randomSuffix}`;
+
+  return key;
+};
+
 export const isValidEmail = (str: string | undefined) => {
   if (!str) return false;
   const emailRegex =
@@ -201,7 +225,7 @@ export const addSitemapPathToBaseUrl = async (
 
 export const isObjectEmpty = (obj: any) => {
   return Object.keys(obj).length === 0;
-}
+};
 
 const parseStringPromise = (xmlData: string) => {
   return new Promise((resolve, reject) => {

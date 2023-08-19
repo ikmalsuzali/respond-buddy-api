@@ -1,86 +1,113 @@
 import { Document } from "langchain/document";
 import { OpenAIEmbeddings } from "langchain/embeddings/openai";
-import { RedisVectorStore } from "langchain/vectorstores/redis";
+import { QdrantVectorStore } from "langchain/vectorstores/qdrant";
 // @ts-ignore
-import { redisClient } from "../../main";
+import { qdrantClient } from "../../main";
 
-export const storeDocsToRedis = async ({
+export const storeDocs = async ({
   docs,
-  workspaceId,
-  storeId,
-  tags,
-  redisKey,
+  key,
 }: {
   docs: Document[];
-  workspaceId: string;
-  storeId: string;
-  tags: string[];
-  redisKey: string;
-}) => { 
-  console.log("🚀 ~ file: service.ts:20 ~ docs:", docs);
-
-  const docsInit = docs.map(
-    (doc) =>
-      new Document({
-        metadata: {
-          workspace_id: workspaceId,
-          store_id: storeId,
-          created_at: new Date(),
-        },
-        pageContent: doc.pageContent,
-      })
-  );
-
-  if (!docsInit.length) throw new Error("Docs is empty");
-
+  key: string;
+}) => {
   try {
-    const vectorStore = await RedisVectorStore.fromDocuments(
-      docsInit,
+    const vectorStore = await QdrantVectorStore.fromDocuments(
+      docs,
       new OpenAIEmbeddings(),
       {
-        // @ts-ignore
-        redisClient,
-        indexName: redisKey,
+        client: qdrantClient,
+        collectionName: key,
       }
     );
-    console.log("🚀 ~ file: service.ts:44 ~ vectorStore:", vectorStore);
+    console.log("🚀 ~ file: service.ts:23 ~ vectorStore:", vectorStore);
+
+    return vectorStore;
   } catch (error) {
     console.log(error);
   }
 };
 
-export const getDocsFromRedis = async ({
-  workspaceId,
-  storeId,
+export const searchCollection = async ({
+  collectionKey,
+  query,
+}: {
+  collectionKey: string;
+  query?: any;
+}) => {
+  const response = await qdrantClient.scroll(collectionKey, {
+    filter: {
+      // should: [
+      //   {
+      //     key: "metadata.type",
+      //     match: {
+      //       value: "system",
+      //     },
+      //   },
+      // ],
+    },
+  });
+  console.debug("🚀 ~ file: service.ts:48 ~ response:", response.points);
+
+  return response.points ? response.points : [];
+};
+
+export const deleteCollection = async ({ key }: { key: string }) => {
+  try {
+    await qdrantClient.deleteCollection(key);
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+export const deletePoints = async ({
+  collectionKey,
+  pointIds = [],
+  filter = {},
+}: {
+  collectionKey: string;
+  pointIds?: string[];
+  filter?: any;
+}) => {
+  try {
+    let response = await qdrantClient.delete(collectionKey, {
+      filter: filter,
+    });
+    console.log("🚀 ~ file: service.ts:74 ~ response:", response);
+
+    return response;
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+export const getDocs = async ({
   message,
+  key,
   similarityCount = 1,
 }: {
-  workspaceId: string | null;
-  storeId: string | null;
   message: string;
+  key: string;
   similarityCount?: number;
 }) => {
   try {
-    const vectorStore = new RedisVectorStore(new OpenAIEmbeddings(), {
-      redisClient: redisClient,
-      indexName: `${workspaceId}:${storeId}`,
-    });
-    console.log(
-      "🚀 ~ file: service.ts:57 ~ vectorStore ~ vectorStore:",
-      vectorStore
+    const vectorStore = await QdrantVectorStore.fromExistingCollection(
+      new OpenAIEmbeddings(),
+      {
+        client: qdrantClient,
+        collectionName: key,
+      }
     );
 
-    console.log(message);
-
-    const docs = await vectorStore.similaritySearch(message, similarityCount);
-    console.log("🚀 ~ file: service.ts:65 ~ docs:", docs);
+    const docs = await vectorStore.similaritySearchWithScore(
+      message,
+      similarityCount
+    );
 
     return (
       {
         vectorStore,
         docs,
-        workspaceId,
-        storeId,
       } || {}
     );
   } catch (error) {

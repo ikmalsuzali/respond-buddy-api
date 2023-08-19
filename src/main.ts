@@ -15,19 +15,17 @@ import { decryptJwt } from "./helpers";
 import { getAllUserWorkspaces } from "./app/userWorkspaces/service";
 import { createClient } from "redis";
 import { registerEvents } from "./events";
-import SlackClientManager, {
-  ClientConfig,
-} from "./app/slack/SlackClientManager";
+// import SlackClientManager from "./app/slack/SlackClientManager";
 import { S3 } from "@aws-sdk/client-s3";
-import { RedisVectorStore } from "langchain/vectorstores/redis";
-import { OpenAIEmbeddings } from "langchain/embeddings/openai";
+import { QdrantClient } from "@qdrant/js-client-rest";
 
 let slack = null;
 let logger = null;
 let redisClient: any = null;
+let qdrantClient: any = null;
 const mailListenerManager = new MailListenerManager();
 const eventManager = new EventManager();
-const slackClientManager = new SlackClientManager();
+// const slackClientManager = new SlackClientManager();
 let s3: any = null;
 const main = async () => {
   const schema = {
@@ -46,6 +44,8 @@ const main = async () => {
       "SUPABASE_KEY",
       "SUPABASE_URL",
       "OPENAI_API_KEY",
+      "QDRANT_ENDPOINT",
+      "QDRANT_KEY",
     ],
     properties: {
       ENVIRONMENT: {
@@ -117,8 +117,21 @@ const main = async () => {
         type: "string",
         default: "",
       },
+      QDRANT_ENDPOINT: {
+        type: "string",
+        default: "",
+      },
+      QDRANT_KEY: {
+        type: "string",
+        default: "",
+      },
     },
   };
+
+  qdrantClient = new QdrantClient({
+    url: process.env.QDRANT_ENDPOINT,
+    apiKey: process.env.QDRANT_KEY,
+  });
 
   // @ts-ignore
   s3 = new S3({
@@ -262,6 +275,7 @@ export {
   mailListenerManager,
   eventManager,
   redisClient,
-  slackClientManager,
+  // slackClientManager,
   s3,
+  qdrantClient,
 };

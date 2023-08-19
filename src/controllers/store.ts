@@ -360,4 +360,7 @@ export function storeRoutes(fastify: FastifyInstance) {
       message: "Store deleted successfully.",
     });
   });
+
+  
+
 }
