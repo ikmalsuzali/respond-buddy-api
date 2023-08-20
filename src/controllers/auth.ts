@@ -87,6 +87,15 @@ export function authRoutes(fastify: FastifyInstance) {
 
       if (!isValidEmail(email)) throw new Error("Invalid email");
 
+      const checkUniqueEmail = await prisma.users.findFirst({
+        where: {
+          username: username,
+        },
+      });
+
+      if (checkUniqueEmail && foundUser?.username !== username)
+        return new Error("Username already exists");
+
       const { user, session, error } = await supabase.auth.signUp({
         email,
         password,
@@ -137,6 +146,25 @@ export function authRoutes(fastify: FastifyInstance) {
         },
       });
 
+      // Get free subscription
+      const freeSubscription = await prisma.stripe_products.findFirst({
+        where: {
+          key: "free",
+          env: fastify.config.ENVIRONMENT === "demo" ? "demo" : "prod",
+        },
+      });
+
+      // Apply free subscription to workspace
+      const workspaceSubscription = await prisma.subscriptions.create({
+        data: {
+          workspace: workspace?.id,
+          stripe_product: freeSubscription?.id, // Free subscription
+        },
+        include: {
+          stripe_products: true,
+        },
+      });
+
       const token = addMetadataToToken(
         session?.access_token,
         fastify?.config.JWT_SECRET,
@@ -149,6 +177,7 @@ export function authRoutes(fastify: FastifyInstance) {
       reply.code(200).send({
         user,
         user_workspace: userWorkspace,
+        subscription: workspaceSubscription,
         session: token,
       });
     }

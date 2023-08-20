@@ -143,4 +143,23 @@ export function workspaceRoutes(fastify: FastifyInstance) {
       });
     }
   );
+
+  // Get workspace subscriptions
+  fastify.get(
+    "/api/v1/workspace/subscription",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const workspaceSubscription = await prisma.subscriptions.findFirst({
+        where: {
+          workspace: request?.token_metadata?.custom_metadata.workspace_id,
+        },
+        include: {
+          stripe_products: true,
+        },
+      });
+
+      if (!workspaceSubscription) return Error("No subscriptions found");
+
+      reply.send(workspaceSubscription);
+    }
+  );
 }
