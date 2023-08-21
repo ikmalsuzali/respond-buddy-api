@@ -38,6 +38,9 @@ export function stripeRoutes(fastify: FastifyInstance) {
       where: {
         env: fastify?.config.ENVIRONMENT == "production" ? "live" : "demo",
       },
+      orderBy: {
+        order: "asc",
+      },
     });
     return reply.send(products);
   });
@@ -45,16 +48,10 @@ export function stripeRoutes(fastify: FastifyInstance) {
   fastify.post(
     "/api/v1/checkout-session",
     async (request: FastifyRequest, reply: FastifyReply) => {
-      let {
-        price_id,
-        additional_prices,
-        pet_id,
-        user_id,
-        success_url,
-        cancel_url,
-      } = request.body as checkoutSessionRequestType;
+      let { price_id, additional_prices, success_url, cancel_url } =
+        request.body as checkoutSessionRequestType;
 
-      let payment = await getFirstPaymentSuccess(pet_id);
+      let payment = await getFirstPaymentSuccess();
       if (payment) {
         return reply
           .status(400)
@@ -75,8 +72,9 @@ export function stripeRoutes(fastify: FastifyInstance) {
       try {
         paymentResponse = await prisma.payments.create({
           data: {
-            pet_id,
-            quantity: 1,
+            workspace: request?.token_metadata?.custom_metadata?.workspace_id,
+            user: request?.token_metadata?.custom_metadata?.user_id,
+            quantity: stripeProduct.quantity,
             stripe_product_id: stripeProduct?.id,
           },
         });
@@ -109,7 +107,7 @@ export function stripeRoutes(fastify: FastifyInstance) {
           payment_intent_data: {
             metadata: {
               client_reference_id: paymentResponse?.id,
-              user_id: user?.id,
+              user_id: request?.token_metadata?.custom_metadata?.user_id,
             },
           },
           client_reference_id: paymentResponse?.id,
@@ -117,15 +115,18 @@ export function stripeRoutes(fastify: FastifyInstance) {
           mode: "payment",
           custom_text: {
             submit: {
-              message: `Daily Ads`,
+              message: `${stripeProduct?.name} - ${stripeProduct?.description} (${stripeProduct?.plan_type})`,
             },
           },
           metadata: {
             client_reference_id: stripeProduct?.id,
-            user_id: user?.id,
+            stripe_product_id: price_id,
+            workspace_id:
+              request?.token_metadata?.custom_metadata?.workspace_id,
+            user_id: request?.token_metadata?.custom_metadata?.user_id,
           },
-          success_url: `${success_url}/payment/${paymentResponse.id}/process?pet_id=${pet_id}`,
-          cancel_url: `${cancel_url}/payment/${paymentResponse.id}/process?pet_id=${pet_id}`,
+          success_url: `${success_url}/payment/${paymentResponse.id}/process`,
+          cancel_url: `${cancel_url}/payment/${paymentResponse.id}/process`,
         });
 
         return reply.send({ stripe_url: session.url });
@@ -193,6 +194,23 @@ export function stripeRoutes(fastify: FastifyInstance) {
           receipt_url: paymentIntent?.charges?.data[0].receipt_url,
         },
       });
+
+      // Delete all older subscriptions
+      await prisma.subscriptions.updateMany({
+        where: {
+          workspace: paymentIntent?.metadata?.workspace_id,
+        },
+        data: {
+          is_deleted: true,
+        },
+      });
+
+      await prisma.subscriptions.create({
+        data: {
+          workspace: paymentIntent?.metadata?.workspace_id,
+          stripe_product: paymentIntent?.metadata?.stripe_product_id,
+        },
+      });
     } catch (error) {
       logger.error({ type: "paymentIntent", data: error });
     }
@@ -214,10 +232,10 @@ export function stripeRoutes(fastify: FastifyInstance) {
     }
   };
 
-  const getFirstPaymentSuccess = async (petId: string) => {
+  const getFirstPaymentSuccess = async () => {
     const payment = await prisma.payments.findFirst({
       where: {
-        pet_id: petId,
+        workspace: request?.token_metadata?.custom_metadata?.workspace_id,
         status: 1,
       },
     });
@@ -225,25 +243,25 @@ export function stripeRoutes(fastify: FastifyInstance) {
     return payment;
   };
 
-  const createStripeCustomer = async (customer: string) => {
-    const customerResponse = await stripeClient.customers.create({
-      email: customer,
-    });
+  // const createStripeCustomer = async (customer: string) => {
+  //   const customerResponse = await stripeClient.customers.create({
+  //     email: customer,
+  //   });
 
-    return customerResponse;
-  };
+  //   return customerResponse;
+  // };
 
-  const getCustomerById = async (customerId: string) => {
-    const customer = await stripeClient.customers.retrieve(customerId);
+  // const getCustomerById = async (customerId: string) => {
+  //   const customer = await stripeClient.customers.retrieve(customerId);
 
-    return customer;
-  };
+  //   return customer;
+  // };
 
-  const deleteSubscription = async (subscriptionId: string) => {
-    const deletedSubscription = await stripeClient.subscriptions.del(
-      subscriptionId
-    );
+  // const deleteSubscription = async (subscriptionId: string) => {
+  //   const deletedSubscription = await stripeClient.subscriptions.del(
+  //     subscriptionId
+  //   );
 
-    return deletedSubscription;
-  };
+  //   return deletedSubscription;
+  // };
 }

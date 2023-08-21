@@ -1,6 +1,10 @@
 // @ts-nocheck
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { prisma } from "../prisma";
+import {
+  getNextRenewalDate,
+  getTimeTillNextCreditRenewal,
+} from "../app/userWorkspaces/service";
 
 export function workspaceRoutes(fastify: FastifyInstance) {
   // Get workspace_integrations
@@ -156,6 +160,13 @@ export function workspaceRoutes(fastify: FastifyInstance) {
           stripe_products: true,
         },
       });
+
+      workspaceSubscription.next_renewal_date = getNextRenewalDate(
+        workspaceSubscription
+      );
+
+      workspaceSubscription.remaining_renewal_days =
+        getTimeTillNextCreditRenewal(workspaceSubscription).days;
 
       if (!workspaceSubscription) return Error("No subscriptions found");
 

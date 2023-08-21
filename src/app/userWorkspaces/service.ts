@@ -70,6 +70,48 @@ import { prisma } from "../../prisma";
 //   return { workspace };
 // };
 
+export const getTimeTillNextCreditRenewal = (subscription: any) => {
+  const now = new Date();
+  const createdAt = new Date(subscription.created_at);
+
+  // Adjust the month of createdAt to the next month
+  createdAt.setMonth(createdAt.getMonth() + 1);
+
+  // Calculate the difference in time
+  const timeDiff = createdAt.getTime() - now.getTime();
+
+  // Return the difference in various units
+  return {
+    milliseconds: timeDiff,
+    seconds: Math.floor(timeDiff / 1000),
+    minutes: Math.floor(timeDiff / (1000 * 60)),
+    hours: Math.floor(timeDiff / (1000 * 60 * 60)),
+    days: Math.floor(timeDiff / (1000 * 60 * 60 * 24)),
+  };
+};
+
+export const getNextRenewalDate = (subscription: any) => {
+  const createdAt = new Date(subscription.created_at);
+
+  // Check the plan_type and adjust the date accordingly
+  switch (subscription.stripe_products?.plan_type) {
+    case "ALL":
+      createdAt.setFullYear(createdAt.getFullYear() + 1);
+      break;
+    case "YEARLY":
+      createdAt.setFullYear(createdAt.getFullYear() + 1);
+      break;
+    case "MONTHLY":
+      createdAt.setMonth(createdAt.getMonth() + 1);
+      break;
+    // Add cases for other types if needed
+    default:
+      throw new Error("Unknown plan_type");
+  }
+
+  return createdAt.toISOString();
+};
+
 export const getAllUserWorkspaces = async (fastify: any, attrs: any) => {
   const { integration_name } = attrs;
   const user_workspaces = await prisma.workspace_integrations.findMany({

@@ -4,6 +4,11 @@ import { decryptJwt, isValidEmail } from "../helpers";
 import { prisma } from "../prisma";
 import "../helpers/bigInt.js";
 import { addMetadataToToken, getValidEmails } from "../helpers/index";
+import { getTimeTillNextCreditRenewal } from "../app/userWorkspaces/service";
+import {
+  getNextRenewalDate,
+  getTimeTillNextCreditRenewal,
+} from "../app/userWorkspaces/service";
 
 export function authRoutes(fastify: FastifyInstance) {
   const { supabase } = fastify;
@@ -164,6 +169,14 @@ export function authRoutes(fastify: FastifyInstance) {
           stripe_products: true,
         },
       });
+
+      // Set next renewal date
+      workspaceSubscription.next_renewal_date = getNextRenewalDate(
+        workspaceSubscription
+      );
+
+      workspaceSubscription.remaining_renewal_days =
+        getTimeTillNextCreditRenewal(workspaceSubscription).days;
 
       const token = addMetadataToToken(
         session?.access_token,
@@ -336,3 +349,22 @@ export function authRoutes(fastify: FastifyInstance) {
     }
   );
 }
+
+const getNextRenewalDate = (subscription) => {
+  const createdAt = new Date(subscription.created_at);
+
+  // Check the plan_type and adjust the date accordingly
+  switch (subscription.stripe_products.plan_type) {
+    case "YEARLY":
+      createdAt.setFullYear(createdAt.getFullYear() + 1);
+      break;
+    case "MONTHLY":
+      createdAt.setMonth(createdAt.getMonth() + 1);
+      break;
+    // Add cases for other types if needed
+    default:
+      throw new Error("Unknown plan_type");
+  }
+
+  return createdAt.toISOString();
+};
