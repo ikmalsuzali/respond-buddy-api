@@ -7,34 +7,37 @@ import os from "os";
 
 export const storeS3File = async ({
   file,
-  workspaceId,
   key,
+  workspaceId,
+  userId,
+  allowedExtensions = [
+    ".csv",
+    ".xls",
+    ".xlsx",
+    ".doc",
+    ".docx",
+    ".db",
+    ".txt",
+    ".pdf",
+    ".html",
+    ".XLSX",
+  ],
 }: {
   file: any;
-  workspaceId: string;
+  workspaceId?: string | null;
   key?: string;
+  userId?: string;
+  allowedExtensions?: string[];
 }) => {
   try {
-    const allowedExtensions = [
-      ".csv",
-      ".xls",
-      ".xlsx",
-      ".doc",
-      ".docx",
-      ".db",
-      ".txt",
-      ".pdf",
-      ".html",
-      ".XLSX",
-    ];
-
     const extension = path?.extname(file?.filename);
 
     if (allowedExtensions.includes(extension)) {
       console.log(file);
 
       const fileBuffer = Buffer.from(await file.toBuffer(), "base64");
-      const newKey = key || `${workspaceId}_${Date.now()}${extension}`;
+      const newKey =
+        key || `${workspaceId || userId}_${Date.now()}${extension}`;
       const uploadParams = {
         Bucket: "respondbuddy",
         Key: newKey,
@@ -88,7 +91,7 @@ export const convertS3UrlToTempFile = async (s3Url: string) => {
     const response = await axios.get(s3Url, { responseType: "arraybuffer" });
     const tempFilePath = path.join(
       os.tmpdir(),
-      `s3file_${Date.now()}.${extension}}`
+      `s3file_${Date.now()}.${extension}`
     );
     fs.writeFileSync(tempFilePath, response.data);
     return tempFilePath;

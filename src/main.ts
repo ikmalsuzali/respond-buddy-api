@@ -185,14 +185,19 @@ const main = async () => {
     data: process.env,
     schema,
   });
-
-  server.register(import("fastify-raw-body"), {
-    field: "rawBody", // change the default request.rawBody property name
-    global: true, // add the rawBody to every request. **Default true**
-    encoding: false, // set it to false to set rawBody as a Buffer **Default utf8**
-    runFirst: true, // get the body before any preParsing hook change/uncompress it. **Default false**
-    // routes: [], // array of routes, **`global`** will be ignored, wildcard routes not supported
+  server.register(require("@fastify/multipart"), {
+    limits: {
+      fileSize: 1048576 * 10,
+    },
   });
+
+  // server.register(import("fastify-raw-body"), {
+  //   field: "rawBody", // change the default request.rawBody property name
+  //   global: true, // add the rawBody to every request. **Default true**
+  //   encoding: false, // set it to false to set rawBody as a Buffer **Default utf8**
+  //   runFirst: true, // get the body before any preParsing hook change/uncompress it. **Default false**
+  //   // routes: [], // array of routes, **`global`** will be ignored, wildcard routes not supported
+  // });
 
   await server.after();
 
@@ -201,23 +206,29 @@ const main = async () => {
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization", "Accept"],
   });
-  server.register(require("@fastify/multipart"), {
-    attachFieldsToBody: true,
-    limits: {
-      fileSize: 1024 * 1024 * 2, // 5MB limit per file
-    },
-  });
   server.register(require("@fastify/formbody"));
   server.register(axiosClient, {
     name: "axios",
   });
   server.register(require("fastify-qs"), {});
-  server.decorate("mailListenerManager", mailListenerManager);
+  // server.decorate("mailListenerManager", mailListenerManager);
   server.decorateRequest("token_metadata", null);
   server.addHook("preHandler", async (request) => {
     // @ts-ignore
     request.token_metadata = decryptJwt(request?.headers?.authorization);
   });
+
+  // server.addHook("onRequest", (request, reply, done) => {
+  //   done(new Error("Some error"));
+  // });
+
+  // server.addHook("onRequest", (req, reply, done) => {
+  //   console.log("🚀 ~ file: main.ts:224 ~ server.addHook ~ req:", req);
+  //   // @ts-ignore
+  //   console.log(req.body);
+  //   req.log.info({ url: req.raw.url, id: req.id }, "received request");
+  //   done();
+  // });
 
   // connect to database
   await prisma.$connect();
@@ -237,13 +248,12 @@ const main = async () => {
   }
 
   try {
-    const workspaceEmailIntegrations = await getAllUserWorkspaces(server, {
-      integration_name: "email",
-    });
+    // const workspaceEmailIntegrations = await getAllUserWorkspaces(server, {
+    //   integration_name: "email",
+    // });
     // const workspaceSlackIntegrations = await getAllUserWorkspaces(server, {
     //   integration_name: "Slack",
     // });
-
     // console.log(workspaceSlackIntegrations);
     // mailListenerManager.init(workspaceEmailIntegrations);
     // @ts-ignore
@@ -259,7 +269,6 @@ const main = async () => {
     //       team_id: workspaceSlackIntegration?.metadata?.team_id,
     //     };
     //   });
-
     // await slackClientManager.init(mappedWorkspaceSlackIntegrations);
   } catch (error) {
     console.log(error);

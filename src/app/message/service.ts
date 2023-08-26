@@ -1,3 +1,4 @@
+// @ts-nocheck
 import {
   ConversationChain,
   LLMChain,
@@ -12,6 +13,7 @@ import { ChatOpenAI } from "langchain/chat_models/openai";
 import { prisma } from "../../prisma";
 import { PromptTemplate } from "langchain/prompts";
 import { multiPromptChain } from "../gpt/service";
+import { getDocs } from "../qdrant/service";
 
 export const processMessage = async ({
   message,
@@ -157,60 +159,97 @@ export const processBasicMessage = async ({
 
 export const processBasicMessageV2 = async ({
   message,
-  userId,
+  workspaceId,
+  tagKey,
+  meta,
 }: {
   message: string;
-  userId: string;
+  workspaceId: string;
+  tagKey: string;
+  meta: any;
 }) => {
   if (!message) throw new Error("Message is empty");
 
-  // Use embeddings to find closest match
-  // If match is found, return match key and id
-  // Find key in database
-  // Find custom function to run
-  // If match is not found, use GPT to generate response
-
-  // const response = await MultiRouteChain.call({
-  //   defaultChain: "default",
-  // });
-
-  // Check how messages sent based on userId
-  // If message >= 10, return message reached max limit for the day
-
-  try {
-    // const prompt = PromptTemplate.fromTemplate(message);
-
-    // const chain = new LLMChain({
-    //   llm: new OpenAI({
-    //     // temperature: 0.1,
-    //   }),
-    //   prompt,
-    // });
-
-    const response = await multiPromptChain().call({
-      input: message,
+  if (tagKey) {
+    const tag = await prisma.tags.findFirst({
+      where: {
+        key: tagKey,
+      },
     });
-    console.log(
-      "🚀 ~ file: service.ts:128 ~ runMultiPromptChain ~ response",
-      response
-    );
 
-    console.log(response);
+    if (tag) {
+      // Write a regex to replace [input] with message
+      let cleanTemplate = replaceInputWithValue(tag?.ai_template, message);
+      const prompt = PromptTemplate.fromTemplate(cleanTemplate);
 
-    if (!response) {
-      return {
-        result: "Sorry, nothing I can find here",
-      };
+      const gptResponse = new LLMChain({
+        llm: new OpenAI({
+          // temperature: 0.1,
+        }),
+        prompt: prompt,
+      });
+    } else {
+      let similarTag = await getDocs({
+        message,
+        key: "tags",
+        similarityCount: 1,
+        filter: {
+          should: [
+            {
+              key: "metadata.type",
+              match: {
+                value: "system",
+              },
+            },
+            {
+              key: "metadata.workspace_id",
+              match: {
+                value: workspaceId,
+              },
+            },
+          ],
+        },
+      });
+
+      console.log("🚀 ~ file: service.ts:214 ~ similarTag:", similarTag);
+
+      if (similarTag?.[0]) {
+        const tag = await prisma.tags.findFirst({
+          where: {
+            id: similarTag[0].metadata.id,
+          },
+        });
+
+        // If no tag revert back to basic prompt
+        if (!tag) {
+          const prompt = PromptTemplate.fromTemplate(message);
+
+          const gptResponse = new LLMChain({
+            llm: new OpenAI({
+              // temperature: 0.1,
+            }),
+            prompt: prompt,
+          });
+        } else {
+        }
+      }
     }
-
-    return {
-      // @ts-ignore
-      result: response.text,
-    };
-  } catch (error) {
-    console.log(error);
   }
 };
+
+// const runFunction = async () => {
+//   const functionMapper = {
+//     'respond-to-message':
+//     'command-by-template':
+//     'summarize-website':
+//     'search-website':
+//     'convert-website-to-pdf':
+//     'send-to-email':
+//     'send-to-mailchimp':
+//     'prefill-fake-form-data':
+//     ''
+//   }
+// }
 
 export const saveMessage = async ({
   message,
@@ -259,4 +298,14 @@ export const saveMessage = async ({
   } catch (error) {
     console.log(error);
   }
+};
+
+const replaceInputWithValue = (
+  inputString: string | null,
+  replacementValue: string
+) => {
+  if (!inputString) return "";
+  const pattern = /\[input\]/g;
+  const replacedString = inputString.replace(pattern, replacementValue);
+  return replacedString || "";
 };

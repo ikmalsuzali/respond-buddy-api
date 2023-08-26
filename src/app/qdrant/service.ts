@@ -3,13 +3,16 @@ import { OpenAIEmbeddings } from "langchain/embeddings/openai";
 import { QdrantVectorStore } from "langchain/vectorstores/qdrant";
 // @ts-ignore
 import { qdrantClient } from "../../main";
+import { updateStoreStatus } from "../store/service";
 
 export const storeDocs = async ({
   docs,
   key,
+  metadata,
 }: {
   docs: Document[];
   key: string;
+  metadata?: any;
 }) => {
   try {
     const vectorStore = await QdrantVectorStore.fromDocuments(
@@ -21,6 +24,10 @@ export const storeDocs = async ({
       }
     );
     console.log("🚀 ~ file: service.ts:23 ~ vectorStore:", vectorStore);
+
+    if (metadata?.storeId) {
+      await updateStoreStatus({ storeId: metadata.storeId });
+    }
 
     return vectorStore;
   } catch (error) {
@@ -85,10 +92,12 @@ export const getDocs = async ({
   message,
   key,
   similarityCount = 1,
+  filter = {},
 }: {
   message: string;
   key: string;
   similarityCount?: number;
+  filter?: any;
 }) => {
   try {
     const vectorStore = await QdrantVectorStore.fromExistingCollection(
@@ -101,7 +110,8 @@ export const getDocs = async ({
 
     const docs = await vectorStore.similaritySearchWithScore(
       message,
-      similarityCount
+      similarityCount,
+      filter
     );
 
     return (

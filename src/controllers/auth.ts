@@ -4,7 +4,6 @@ import { decryptJwt, isValidEmail } from "../helpers";
 import { prisma } from "../prisma";
 import "../helpers/bigInt.js";
 import { addMetadataToToken, getValidEmails } from "../helpers/index";
-import { getTimeTillNextCreditRenewal } from "../app/userWorkspaces/service";
 import {
   getNextRenewalDate,
   getTimeTillNextCreditRenewal,
@@ -94,12 +93,19 @@ export function authRoutes(fastify: FastifyInstance) {
 
       const checkUniqueEmail = await prisma.users.findFirst({
         where: {
+          email: email,
+        },
+      });
+
+      const foundUser = await prisma.users.findFirst({
+        where: {
           username: username,
         },
       });
 
-      if (checkUniqueEmail && foundUser?.username !== username)
-        return new Error("Username already exists");
+      if (checkUniqueEmail) return new Error("Email already exists");
+
+      if (foundUser) return new Error("Username already exists");
 
       const { user, session, error } = await supabase.auth.signUp({
         email,
@@ -177,6 +183,16 @@ export function authRoutes(fastify: FastifyInstance) {
 
       workspaceSubscription.remaining_renewal_days =
         getTimeTillNextCreditRenewal(workspaceSubscription).days;
+
+      await prisma.workspaces.update({
+        where: {
+          id: workspace?.id,
+        },
+        data: {
+          credit_count:
+            workspaceSubscription?.stripe_products?.meta?.renewal?.monthly,
+        },
+      });
 
       const token = addMetadataToToken(
         session?.access_token,
@@ -349,22 +365,3 @@ export function authRoutes(fastify: FastifyInstance) {
     }
   );
 }
-
-const getNextRenewalDate = (subscription) => {
-  const createdAt = new Date(subscription.created_at);
-
-  // Check the plan_type and adjust the date accordingly
-  switch (subscription.stripe_products.plan_type) {
-    case "YEARLY":
-      createdAt.setFullYear(createdAt.getFullYear() + 1);
-      break;
-    case "MONTHLY":
-      createdAt.setMonth(createdAt.getMonth() + 1);
-      break;
-    // Add cases for other types if needed
-    default:
-      throw new Error("Unknown plan_type");
-  }
-
-  return createdAt.toISOString();
-};

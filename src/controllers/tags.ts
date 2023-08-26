@@ -23,45 +23,41 @@ export function tagsRoutes(fastify: FastifyInstance) {
 
       let filter = {};
 
-      if (search) {
-        filter = {
-          OR: [
-            {
-              name: {
-                contains: search,
-                mode: "insensitive",
+      filter = {
+        OR: [
+          {
+            name: {
+              contains: search,
+              mode: "insensitive",
+            },
+          },
+          {
+            used_description: {
+              contains: search,
+              mode: "insensitive",
+            },
+          },
+          {
+            ai_template: {
+              contains: search,
+              mode: "insensitive",
+            },
+          },
+        ],
+        AND: [
+          {
+            OR: [
+              {
+                workspace:
+                  request?.token_metadata?.custom_metadata.workspace_id,
               },
-            },
-            {
-              used_description: {
-                contains: search,
-                mode: "insensitive",
+              {
+                is_system_tag: true,
               },
-            },
-            {
-              ai_template: {
-                contains: search,
-                mode: "insensitive",
-              },
-            },
-          ],
-          AND: [
-            {
-              OR: [
-                {
-                  workspace:
-                    request?.token_metadata?.custom_metadata.workspace_id,
-                },
-                {
-                  is_system_tag: true,
-                },
-              ],
-            },
-          ],
-        };
-      }
-
-      console.info("filter", filter);
+            ],
+          },
+        ],
+      };
 
       try {
         const tags = await prisma.tags.findMany({

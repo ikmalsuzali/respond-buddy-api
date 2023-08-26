@@ -3,8 +3,7 @@ import axios from "axios";
 import * as cheerio from "cheerio";
 import premiumWebsiteUrl from "../../json/websiteUrl.js";
 import { PDFLoader } from "langchain/document_loaders/fs/pdf";
-import { getOrCreateTag } from "../tags/service.ts";
-import { storeDocsToRedis } from "../redis/service.ts";
+import { storeDocs } from "../qdrant/service.ts";
 import { storeS3File } from "../s3/service.ts";
 import { prisma } from "../../prisma";
 import { textLoader } from "../loader/service.ts";
@@ -65,47 +64,62 @@ export const saveStore = async (attrs: any) => {
       s3: s3Id,
       store_type: storeTypeId,
       created_by: createdBy,
+      status: "processing",
     },
   });
 
-  let redisKey = `${workspaceId}:${store.id}`;
-
-  console.log("🚀 ~ file: service.ts:67 ~ saveStore ~ redisKey:", redisKey);
-
-  console.log("🚀 ~ file: service.ts:69 ~ saveStore ~ docs", docs);
-
-  await storeDocsToRedis({
-    docs,
-    workspaceId: workspaceId,
-    storeId: store.id,
-    tags,
-    redisKey,
+  docs.forEach((doc, index) => {
+    docs[index].metadata = {
+      ...doc.metadata,
+      ...metadata,
+      workspace_id: workspaceId,
+      store_id: store.id,
+    };
   });
 
-  const storeTags = [];
+  storeDocs({
+    docs,
+    key: workspaceId,
+    metadata: {
+      storeId: store.id,
+    },
+  });
 
-  if (!tags) return { store, storeTags: [] };
-  for (const tag of tags) {
-    const { createdTag, error } = await getOrCreateTag({
-      name: tag.name,
-      workspaceId: workspaceId,
-      description: tag.description,
-      ai_default_response: tag.ai_default_response,
-    });
+  // const storeTags = [];
 
-    if (error) throw error;
+  // if (!tags) return { store, storeTags: [] };
+  // for (const tag of tags) {
+  //   const { createdTag, error } = await getOrCreateTag({
+  //     name: tag.name,
+  //     workspaceId: workspaceId,
+  //     description: tag.description,
+  //     ai_default_response: tag.ai_default_response,
+  //   });
 
-    const storeTag = await prisma.storeTag.create({
-      data: {
-        store: store.id,
-        tag: tag.id,
-      },
-    });
+  //   if (error) throw error;
 
-    storeTags.push(storeTag);
-  }
+  //   const storeTag = await prisma.storeTag.create({
+  //     data: {
+  //       store: store.id,
+  //       tag: tag.id,
+  //     },
+  //   });
 
-  return { store, storeTags };
+  // storeTags.push(storeTag);
+  // }
+
+  return { store };
+};
+
+export const updateStoreStatus = async ({ storeId }: { storeId: number }) => {
+  await prisma.store.update({
+    where: {
+      store_id: storeId,
+    },
+    data: {
+      status: "completed",
+    },
+  });
 };
 
 export const getTextByRaw = async (text: string) => {

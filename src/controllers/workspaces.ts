@@ -152,6 +152,7 @@ export function workspaceRoutes(fastify: FastifyInstance) {
   fastify.get(
     "/api/v1/workspace/subscription",
     async (request: FastifyRequest, reply: FastifyReply) => {
+      console.log(request?.token_metadata?.custom_metadata.workspace_id);
       const workspaceSubscription = await prisma.subscriptions.findFirst({
         where: {
           workspace: request?.token_metadata?.custom_metadata.workspace_id,
@@ -160,6 +161,10 @@ export function workspaceRoutes(fastify: FastifyInstance) {
           stripe_products: true,
         },
       });
+      console.log(
+        "🚀 ~ file: workspaces.ts:163 ~ workspaceSubscription:",
+        workspaceSubscription
+      );
 
       workspaceSubscription.next_renewal_date = getNextRenewalDate(
         workspaceSubscription

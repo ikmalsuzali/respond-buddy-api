@@ -18,6 +18,7 @@ model users {
   user_id         String?           @db.Uuid
   username        String?           @db.VarChar
   customers       customers[]
+  payments        payments[]
   s3              s3[]
   store           store[]
   user_workspaces user_workspaces[]
@@ -35,6 +36,7 @@ model stripe_products {
   meta            Json?
   plan_type       String?         @db.VarChar
   order           Int?            @db.SmallInt
+  payments        payments[]
   subscriptions   subscriptions[]
 }
 
@@ -136,7 +138,9 @@ model workspaces {
   email                  String?                  @db.VarChar
   created_at             DateTime?                @default(now()) @db.Timestamptz(6)
   description            String?                  @db.VarChar
+  credit_count           Int?
   customers              customers[]
+  payments               payments[]
   s3                     s3[]
   store                  store[]
   subscriptions          subscriptions[]
@@ -207,6 +211,7 @@ model store {
   created_by   String?      @db.Uuid
   s3           String?      @db.Uuid
   store_type   String?      @db.Uuid
+  status       String?      @db.VarChar
   users        users?       @relation(fields: [created_by], references: [id], onUpdate: NoAction)
   s3_s3Tostore s3?          @relation(fields: [s3], references: [id], onUpdate: NoAction)
   store_types  store_types? @relation(fields: [store_type], references: [id], onUpdate: NoAction)
@@ -281,7 +286,25 @@ model subscriptions {
   stripe_subscription_id String?                @db.VarChar
   created_at             DateTime               @default(now()) @db.Timestamptz(6)
   stripe_product         String?                @db.Uuid
+  next_renewal_date      DateTime?              @db.Timestamptz(6)
   stripe_products        stripe_products?       @relation(fields: [stripe_product], references: [id], onUpdate: NoAction)
   workspaces             workspaces?            @relation(fields: [workspace], references: [id], onUpdate: NoAction)
   subscription_add_ons   subscription_add_ons[]
+}
+
+model payments {
+  id                       String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  status                   Int?             @default(0) @db.SmallInt
+  created_at               DateTime         @default(now()) @db.Timestamptz(6)
+  workspace                String?          @db.Uuid
+  quantity                 Int?
+  start_date               DateTime?        @db.Timestamptz(6)
+  end_date                 DateTime?        @db.Timestamptz(6)
+  stripe_product           String?          @db.Uuid
+  receipt_url              String?
+  stripe_payment_intent_id String?
+  user                     String?          @db.Uuid
+  stripe_products          stripe_products? @relation(fields: [stripe_product], references: [id], onUpdate: NoAction)
+  users                    users?           @relation(fields: [user], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  workspaces               workspaces?      @relation(fields: [workspace], references: [id], onUpdate: NoAction)
 }

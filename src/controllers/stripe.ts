@@ -20,15 +20,11 @@ export function stripeRoutes(fastify: FastifyInstance) {
   const enviroment = fastify?.config.ENVIRONMENT;
 
   const stripeClient = new Stripe(stripeSecret, {
-    apiVersion: "2022-11-15",
+    apiVersion: "2023-08-16",
   });
 
   type checkoutSessionRequestType = {
     price_id: string;
-    quantity: number;
-    success_url: string;
-    cancel_url: string;
-    pet_id: string;
     user_id: string;
   };
 
@@ -48,54 +44,52 @@ export function stripeRoutes(fastify: FastifyInstance) {
   fastify.post(
     "/api/v1/checkout-session",
     async (request: FastifyRequest, reply: FastifyReply) => {
-      let { price_id, additional_prices, success_url, cancel_url } =
-        request.body as checkoutSessionRequestType;
+      let { plan_id, additional_prices = [] } = request.body;
 
-      let payment = await getFirstPaymentSuccess();
-      if (payment) {
-        return reply
-          .status(400)
-          .send({ message: "Payment has been made already" });
-      }
-
-      let paymentResponse = null;
-
-      let stripeProduct = await prisma.stripe_products.findFirst({
-        where: {
-          stripe_price_id: price_id,
-        },
-      });
-
-      if (!stripeProduct)
-        return reply.status(400).send({ message: "No stripe product found" });
+      const url = fastify?.config.BASE_URL;
+      console.log("url", url);
+      console.log("🚀 ~ file: stripe.ts:48 ~ price_id:", plan_id);
 
       try {
+        let payment = await getFirstPaymentSuccess(
+          request?.token_metadata?.custom_metadata?.workspace_id
+        );
+        if (payment) {
+          return reply
+            .status(400)
+            .send({ message: "Payment has been made already" });
+        }
+
+        let paymentResponse = null;
+
+        let stripeProduct = await prisma.stripe_products.findFirst({
+          where: {
+            stripe_price_id: plan_id,
+          },
+        });
+
+        if (!stripeProduct)
+          return reply.status(400).send({ message: "No stripe product found" });
+
         paymentResponse = await prisma.payments.create({
           data: {
             workspace: request?.token_metadata?.custom_metadata?.workspace_id,
             user: request?.token_metadata?.custom_metadata?.user_id,
             quantity: stripeProduct.quantity,
-            stripe_product_id: stripeProduct?.id,
+            stripe_product: stripeProduct?.id,
           },
         });
-      } catch (error) {
-        request.log.error({ type: "stripe-webhook", data: error });
-        return reply.status(500).send({ message: "Unexpected error" });
-      }
 
-      let user = await prisma.users.findUnique({
-        where: {
-          id: user_id,
-        },
-      });
+        let user = await prisma.users.findUnique({
+          where: {
+            id: request?.token_metadata?.custom_metadata?.user_id,
+          },
+        });
 
-      console.log(success_url);
-
-      try {
         const session = await stripeClient.checkout.sessions.create({
           line_items: [
             {
-              price: price_id,
+              price: stripeProduct.stripe_price_id,
               quantity: stripeProduct.quantity,
             },
           ],
@@ -103,8 +97,8 @@ export function stripeRoutes(fastify: FastifyInstance) {
           automatic_tax: {
             enabled: true,
           },
-          add_invoice_items: additional_prices,
-          payment_intent_data: {
+          // add_invoice_items: additional_prices,
+          subscription_data: {
             metadata: {
               client_reference_id: paymentResponse?.id,
               user_id: request?.token_metadata?.custom_metadata?.user_id,
@@ -112,7 +106,7 @@ export function stripeRoutes(fastify: FastifyInstance) {
           },
           client_reference_id: paymentResponse?.id,
           customer_email: user?.email!,
-          mode: "payment",
+          mode: "subscription",
           custom_text: {
             submit: {
               message: `${stripeProduct?.name} - ${stripeProduct?.description} (${stripeProduct?.plan_type})`,
@@ -120,17 +114,18 @@ export function stripeRoutes(fastify: FastifyInstance) {
           },
           metadata: {
             client_reference_id: stripeProduct?.id,
-            stripe_product_id: price_id,
+            stripe_product_id: plan_id,
             workspace_id:
               request?.token_metadata?.custom_metadata?.workspace_id,
             user_id: request?.token_metadata?.custom_metadata?.user_id,
           },
-          success_url: `${success_url}/payment/${paymentResponse.id}/process`,
-          cancel_url: `${cancel_url}/payment/${paymentResponse.id}/process`,
+          success_url: `${url}/payment/${paymentResponse.id}/process`,
+          cancel_url: `${url}/payment/${paymentResponse.id}/process`,
         });
 
         return reply.send({ stripe_url: session.url });
       } catch (error) {
+        console.log(error);
         return reply.status(500).send(error);
       }
     }
@@ -232,10 +227,10 @@ export function stripeRoutes(fastify: FastifyInstance) {
     }
   };
 
-  const getFirstPaymentSuccess = async () => {
+  const getFirstPaymentSuccess = async (workspaceId) => {
     const payment = await prisma.payments.findFirst({
       where: {
-        workspace: request?.token_metadata?.custom_metadata?.workspace_id,
+        workspace: workspaceId,
         status: 1,
       },
     });

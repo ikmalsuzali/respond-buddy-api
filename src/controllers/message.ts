@@ -8,6 +8,7 @@ import {
   saveMessage,
 } from "../app/message/service";
 import { getCustomer, saveCustomer } from "../app/customer/service";
+import { summarizeWebsite } from "../app/function/summarizeWebsite";
 
 export function messageEvents(fastify: FastifyInstance) {
   eventManager.on("workflow", async (data: any) => {
@@ -223,5 +224,12 @@ export function messageRoutes(fastify: FastifyInstance) {
         .status(500)
         .send({ success: false, message: "Failed to retrieve messages." });
     }
+  });
+
+  fastify.get("/api/v1/function/test", async (request, reply) => {
+    const summary = await summarizeWebsite({
+      url: "https://edition.cnn.com/2023/08/21/economy/china-economy-troubles-intl-hnk/index.html",
+    });
+    reply.send({ success: true, message: summary });
   });
 }

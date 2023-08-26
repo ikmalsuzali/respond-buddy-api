@@ -128,79 +128,32 @@ export function storeRoutes(fastify: FastifyInstance) {
   });
 
   fastify.get("/api/v1/store", async (request, reply) => {
-    const {
-      search,
-      page,
-      limit,
-      store_types,
-      sortField,
-      sortOrder,
-    }: {
-      search: string;
-      page: number;
-      limit: number;
-      store_types: string[];
-      sortField: string;
-      sortOrder: string;
-    } = request.query || {};
+    const page = Number(request.query.page) || 1;
+    const limit = Number(request.query.limit) || 12;
+    const search = request.query.search || "";
 
     const pageLimit = parseInt(limit);
-    const skip = (page - 1) * pageLimit;
     let where = {
       workspace: request?.token_metadata?.custom_metadata?.workspace_id,
     };
+
     let orderBy = {
-      ["created_at"]: sortOrder || "desc",
+      ["created_at"]: "desc",
     };
-
-    if (store_types?.length > 0) {
-      where.store_type_id = {
-        in: store_types,
-      };
-    }
-
-    if (sortField) {
-      orderBy = {
-        [sortField]: sortOrder || "desc",
-      };
-    }
-
-    if (sortField === "name") {
-      orderBy = {
-        s3_s3Tostore: {
-          original_name: sortOrder || "desc",
-        },
-      };
-    }
-
-    if (sortField === "size") {
-      orderBy = {
-        s3_s3Tostore: {
-          file_size: sortOrder || "desc",
-        },
-      };
-    }
-
-    if (sortField === "created_by") {
-      orderBy = {
-        users: {
-          name: sortOrder || "desc",
-        },
-      };
-    }
 
     if (search) {
       where.s3_s3Tostore = {
         original_name: {
           contains: search,
+          mode: "insensitive",
         },
       };
     }
 
     try {
       const stores = await prisma.store.findMany({
+        skip: (page - 1) * limit,
         take: pageLimit,
-        skip,
         where,
         orderBy,
         include: {
@@ -210,30 +163,30 @@ export function storeRoutes(fastify: FastifyInstance) {
         },
       });
 
-      const totalStores = await prisma.store.findMany({
-        where: {
-          workspace: request?.token_metadata?.custom_metadata?.workspace_id,
-        },
+      const totalStores = await prisma.store.count({
+        where,
       });
 
       if (!stores) {
         reply.send({
-          success: true,
           message: "No memories found",
-          data: {
-            stores: [],
-            total_count: totalStores.length,
-          },
+          success: true,
+          data: [],
+          total: totalStores,
+          page: page,
+          limit: limit,
+          totalPages: Math.ceil(totalStores / limit),
         });
       }
 
       reply.send({
         success: true,
+        data: stores,
         message: "Memories retrieved successfully.",
-        data: {
-          stores: stores,
-          total_count: totalStores.length,
-        },
+        total: totalStores,
+        page: page,
+        limit: limit,
+        totalPages: Math.ceil(totalStores / limit),
       });
     } catch (error) {
       reply.badRequest(error);
@@ -254,8 +207,6 @@ export function storeRoutes(fastify: FastifyInstance) {
         workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
         filename: filename || "Untitled text",
       });
-
-      console.log("🚀 ~ file: store.ts:213 ~ fastify.post ~ _docs:", rawData);
 
       docs = rawData.docs;
       s3Url = rawData.s3Url;
@@ -301,16 +252,14 @@ export function storeRoutes(fastify: FastifyInstance) {
     let hash = null;
     let s3UrlData = null;
     if (s3Url) {
+      // Hash the file to check if it's already uploaded
       hash = await computeFileMD5(s3Url);
-
       s3UrlData = await prisma.s3.findFirst({
         where: {
           s3_url: s3Url,
         },
       });
     }
-
-    console.log("🚀 ~ file: store.ts:251 ~ fastify.post ~ docs:", docs);
 
     const storeData = await saveStore({
       createdBy: request.token_metadata.custom_metadata?.user_id,
@@ -360,7 +309,4 @@ export function storeRoutes(fastify: FastifyInstance) {
       message: "Store deleted successfully.",
     });
   });
-
-  
-
 }
