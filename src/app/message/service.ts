@@ -14,6 +14,8 @@ import { prisma } from "../../prisma";
 import { PromptTemplate } from "langchain/prompts";
 import { multiPromptChain } from "../gpt/service";
 import { getDocs } from "../qdrant/service";
+import { HumanMessage } from "langchain/schema";
+import { summarizeWebsite } from "../function/summarizeWebsite";
 
 export const processMessage = async ({
   message,
@@ -164,92 +166,188 @@ export const processBasicMessageV2 = async ({
   meta,
 }: {
   message: string;
-  workspaceId: string;
-  tagKey: string;
-  meta: any;
+  workspaceId?: string;
+  tagKey?: string;
+  meta?: any;
 }) => {
-  if (!message) throw new Error("Message is empty");
+  const chat = new ChatOpenAI({});
 
+  if (!message) throw new Error("Message is empty");
   if (tagKey) {
+    // Check if tag has a key
     const tag = await prisma.tags.findFirst({
       where: {
         key: tagKey,
       },
     });
 
+    // If tag has a key and has ai template refer to that prompt
+    // If tag has no ai template, use basic prompt
     if (tag) {
       // Write a regex to replace [input] with message
-      let cleanTemplate = replaceInputWithValue(tag?.ai_template, message);
-      const prompt = PromptTemplate.fromTemplate(cleanTemplate);
-
-      const gptResponse = new LLMChain({
-        llm: new OpenAI({
-          // temperature: 0.1,
-        }),
-        prompt: prompt,
-      });
-    } else {
-      let similarTag = await getDocs({
-        message,
-        key: "tags",
-        similarityCount: 1,
-        filter: {
-          should: [
-            {
-              key: "metadata.type",
-              match: {
-                value: "system",
+      if (workspaceId && tag.command_type === "respond") {
+        let similarDoc = await getDocs({
+          message,
+          key: workspaceId,
+          similarityCount: 1,
+          filter: {
+            should: [
+              {
+                key: "metadata.workspace_id",
+                match: {
+                  value: workspaceId,
+                },
               },
-            },
-            {
-              key: "metadata.workspace_id",
-              match: {
-                value: workspaceId,
-              },
-            },
-          ],
-        },
-      });
-
-      console.log("🚀 ~ file: service.ts:214 ~ similarTag:", similarTag);
-
-      if (similarTag?.[0]) {
-        const tag = await prisma.tags.findFirst({
-          where: {
-            id: similarTag[0].metadata.id,
+            ],
           },
         });
 
-        // If no tag revert back to basic prompt
-        if (!tag) {
-          const prompt = PromptTemplate.fromTemplate(message);
+        if (similarDoc?.[0]) {
+          const result = await chat.predict(
+            `Answer this: ${message} using this information: ${similarDoc?.[0].pageContent}`
+          );
 
-          const gptResponse = new LLMChain({
-            llm: new OpenAI({
-              // temperature: 0.1,
-            }),
-            prompt: prompt,
-          });
-        } else {
+          return result;
         }
       }
+      let cleanTemplate = message;
+      if (tag?.ai_template) {
+        cleanTemplate = replaceInputWithValue(tag?.ai_template, message);
+      }
+
+      const result = await chat.predict(cleanTemplate);
+
+      return result;
+
+      // If no tag exists, use qdrant to find similar tags
+    }
+  } else {
+    let similarTag = await getDocs({
+      message,
+      key: "tags",
+      similarityCount: 1,
+      filter: {
+        should: [
+          {
+            key: "metadata.type",
+            match: {
+              value: "system",
+            },
+          },
+          {
+            key: "metadata.workspace_id",
+            match: {
+              value: workspaceId,
+            },
+          },
+        ],
+      },
+    });
+    // Need to check most similar tag > 60% match
+
+    console.log("🚀 ~ file: service.ts:214 ~ similarTag:", similarTag);
+
+    if (similarTag?.[0] && similarTag?.[1] > 0.7) {
+      const tag = await prisma.tags.findFirst({
+        where: {
+          id: similarTag[0].metadata.id,
+        },
+      });
+
+      // If no tag revert back to basic prompt
+      if (!tag) {
+        const result = await chat.predict(message);
+
+        return result;
+        // If no tag has ai template, use basic prompt
+      } else {
+        let cleanTemplate = message;
+        if (tag?.ai_template) {
+          cleanTemplate = replaceInputWithValue(tag?.ai_template, message);
+        }
+
+        const result = await chat.predict(cleanTemplate);
+        return result;
+      }
+      // Use basic prompt
+    } else {
+      const result = await chat.predict(message);
+
+      return result;
     }
   }
 };
 
-// const runFunction = async () => {
-//   const functionMapper = {
-//     'respond-to-message':
-//     'command-by-template':
-//     'summarize-website':
-//     'search-website':
-//     'convert-website-to-pdf':
-//     'send-to-email':
-//     'send-to-mailchimp':
-//     'prefill-fake-form-data':
-//     ''
-//   }
-// }
+export const processBasicMessageV3 = async ({
+  message,
+  userId,
+  res,
+}: {
+  message: string;
+  userId: string;
+  res?: any;
+}) => {
+  let aggregatedTokens = [];
+
+  const chat = new ChatOpenAI({
+    streaming: true,
+  });
+  res.header("Content-Type", "application/octet-stream");
+
+  if (!message) throw new Error("Message is empty");
+
+  // Check how messages sent based on userId
+  // If message >= 10, return message reached max limit for the day
+
+  try {
+    // const prompt = PromptTemplate.fromTemplate(message);
+
+    // const chain = new LLMChain({
+    //   llm: new OpenAI({
+    //     // temperature: 0.1,
+    //   }),
+    //   prompt,
+    // });
+    let count = 0;
+
+    const response = await chat.call([new HumanMessage(message)], {
+      callbacks: [
+        {
+          handleLLMNewToken(token: string) {
+            console.log("New token:", token);
+            aggregatedTokens.push(token);
+            count++;
+            res.sse({ id: count, data: token });
+          },
+        },
+      ],
+    });
+
+    if (!response) {
+      return {
+        result: "Sorry, nothing I can find here",
+      };
+    }
+
+    res.sse();
+
+    return {
+      // @ts-ignore
+      result: response,
+    };
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+const runFunction = async (tagFunction, message, metadata) => {
+  const functionMapper = {
+    "summarize-website": summarizeWebsite({ message, metadata }),
+  };
+
+  // Run function based on tag function
+  let response = await functionMapper[tagFunction]();
+};
 
 export const saveMessage = async ({
   message,
