@@ -42,16 +42,16 @@ export const saveStore = async (attrs: any) => {
     createdBy,
   } = attrs;
 
-  if (hash) {
-    const existingStore = await prisma.store.findFirst({
-      where: {
-        workspace: workspaceId,
-        hash,
-      },
-    });
+  // if (hash) {
+  //   const existingStore = await prisma.store.findFirst({
+  //     where: {
+  //       workspace: workspaceId,
+  //       hash,
+  //     },
+  //   });
 
-    if (existingStore) throw new Error("Memory already exists");
-  }
+  //   if (existingStore) throw new Error("Memory already exists");
+  // }
 
   const store = await prisma.store.create({
     data: {
@@ -111,10 +111,10 @@ export const saveStore = async (attrs: any) => {
   return { store };
 };
 
-export const updateStoreStatus = async ({ storeId }: { storeId: number }) => {
+export const updateStoreStatus = async ({ storeId }: { storeId: string }) => {
   await prisma.store.update({
     where: {
-      store_id: storeId,
+      id: storeId,
     },
     data: {
       status: "completed",

@@ -68,6 +68,7 @@
     "fastify-qs": "^4.0.1",
     "fastify-raw-body": "^4.2.0",
     "fastify-sensible": "^3.2.0",
+    "fastify-sse-v2": "^3.1.2",
     "fastify-stripe": "^2.4.1",
     "fastify-supabase": "^1.2.1",
     "fastify-webhook": "^4.0.1",

@@ -154,7 +154,10 @@ const regexArray = (string: string) => {
 };
 
 export const multiPromptChain = () => {
-  const llm = new OpenAIChat();
+
+  const llm = new OpenAIChat({
+    streaming: true,
+  });
   const promptNames = ["summarize", "simplify", "expand", "translate", "other"];
   const promptDescriptions = [
     "Used when summarizing a text",

@@ -33,17 +33,6 @@ export function storeRoutes(fastify: FastifyInstance) {
 
       console.log(data);
 
-      // const result = await Promise.all(
-      //   data.map((storeType) => {
-      //     countFilteredStores(
-      //       request?.token_metadata?.custom_metadata?.workspace_id,
-      //       storeType.id
-      //     );
-      //   })
-      // );
-
-      // console.log(result);
-
       reply.send({
         success: true,
         message: "Store types retrieved successfully.",

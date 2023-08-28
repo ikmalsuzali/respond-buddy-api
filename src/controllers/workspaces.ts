@@ -178,4 +178,21 @@ export function workspaceRoutes(fastify: FastifyInstance) {
       reply.send(workspaceSubscription);
     }
   );
+
+  fastify.get("/api/v1/credit", async (request, reply) => {
+    const workspaceCredit = await prisma.workspaces.findFirst({
+      where: {
+        id: request?.token_metadata?.custom_metadata.workspace_id,
+      },
+      select: {
+        credit_count: true,
+      },
+    });
+    console.log(
+      "🚀 ~ file: workspaces.ts:191 ~ fastify.get ~ workspaceCredit:",
+      workspaceCredit
+    );
+
+    reply.send({ credit: workspaceCredit.credit_count || 0 });
+  });
 }

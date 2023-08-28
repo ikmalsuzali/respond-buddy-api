@@ -8,40 +8,13 @@ import fs from "fs";
 export function s3Routes(fastify: FastifyInstance) {
   fastify.post("/api/v1/file/upload", async (request, reply) => {
     try {
-      // console.log("file", await request.files());
-      // for await (const part of request.parts()) {
-      //   if (part.file) {
-      //     const buff = await part.toBuffer();
-      //     console.log(part);
-      //   }
-      // }
       const part = await request.file();
-      // console.log("🚀 ~ file: s3.ts:12 ~ fastify.post ~ parts:", part);
-
-      // const filePath = `uploads/${part.filename}`;
-
-      // await pump(part.file, fs.createWriteStream(filePath));
-      // fs.writeFileSync(filePath, await parts.toBuffer());
-
       const fileSize = part?.file?.bytesRead || part?.byteLength || part.size;
-
-      console.log("🚀 ~ file: s3.ts:49 ~ fastify.post ~ file:", part);
-      console.log("🚀 ~ file: s3.ts:13 ~ fastify.post ~ fileSize:", fileSize);
 
       const uploadResult = await storeS3File({
         file: part,
         workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
       });
-      console.log(
-        "🚀 ~ file: s3.ts:17 ~ fastify.post ~ uploadResult:",
-        uploadResult
-      );
-
-      // Case 1:
-      // Upload the file
-      // Run the loaders based on file type
-      // Save the doc from loaders to s3 also based on filename.gpt
-      // Save the file in redis
 
       await prisma.s3.create({
         data: {

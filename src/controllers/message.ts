@@ -4,6 +4,8 @@ import { eventManager } from "../main";
 import { prisma } from "../prisma";
 import {
   processBasicMessage,
+  processBasicMessageV2,
+  processBasicMessageV3,
   processMessage,
   saveMessage,
 } from "../app/message/service";
@@ -110,23 +112,25 @@ export function messageRoutes(fastify: FastifyInstance) {
   fastify.post(
     "/api/v1/message",
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const { message, store_id, user_identity } = request.body || {};
+      const { message, store_id, user_identity, metadata } = request.body || {};
 
       let customer = null;
       let userIdentity =
         user_identity || request?.token_metadata?.custom_metadata?.user_id;
       // Get/Save customer information
-      if (userIdentity) {
-        customer = await getCustomer({
-          workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
-          userIdentity,
+      customer = await getCustomer({
+        workspaceId:
+          request?.token_metadata?.custom_metadata?.workspace_id || null,
+        userIdentity,
+      });
+      if (!customer) {
+        // Save customer
+        customer = await saveCustomer({
+          workspaceId:
+            request?.token_metadata?.custom_metadata?.workspace_id || null,
+          randomUserId: userIdentity,
+          userId: request?.token_metadata?.custom_metadata?.user_id || null,
         });
-        if (!customer) {
-          // Save customer
-          customer = await saveCustomer({
-            workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
-          });
-        }
       }
 
       const userMessage = await saveMessage({
@@ -135,16 +139,15 @@ export function messageRoutes(fastify: FastifyInstance) {
         storeId: store_id,
       });
 
-      const response = await processMessage({
+      const response = await processBasicMessageV2({
         message: message,
         workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
         storeId: store_id,
+        tagKey: metadata?.tag_key,
       });
 
-      console.log("🚀 ~ file: message.ts:139 ~ response:", response);
-
       await saveMessage({
-        message: response.text || response.result,
+        message: response,
         storeId: store_id,
         originalMessageId: userMessage.id,
       });
@@ -152,15 +155,17 @@ export function messageRoutes(fastify: FastifyInstance) {
       reply.send({
         success: true,
         data: {
-          message: response.text || response.result,
+          message: response,
           customer: customer?.id,
         },
       });
     }
   );
 
-  fastify.post("/api/v1/message/free", async (request, reply) => {
-    const { message, user_id } = request.body || {};
+  fastify.get("/api/v1/message/free", async (request, reply) => {
+    const { message, user_id } = request.query || {};
+    console.log("🚀 ~ file: message.ts:164 ~ fastify.post ~ user_id:", user_id);
+    console.log("🚀 ~ file: message.ts:164 ~ fastify.post ~ message:", message);
 
     try {
       let customer = null;
@@ -185,20 +190,25 @@ export function messageRoutes(fastify: FastifyInstance) {
 
       console.log("userMessage", userMessage);
 
-      const response = await processBasicMessage({
+      const response = await processBasicMessageV3({
         message: message,
         userId: customer?.id,
+        res: reply,
       });
+      console.log(
+        "🚀 ~ file: message.ts:194 ~ fastify.post ~ response:",
+        response?.result
+      );
 
-      await saveMessage({
-        message: response?.text || response.result,
-        originalMessageId: userMessage.id,
-      });
+      // await saveMessage({
+      //   message: response?.text || response.result,
+      //   originalMessageId: userMessage.id,
+      // });
 
       reply.send({
         success: true,
         data: {
-          message: response.text || response.result,
+          message: response?.result.content,
           customer: customer?.id,
         },
       });
@@ -223,6 +233,50 @@ export function messageRoutes(fastify: FastifyInstance) {
       reply
         .status(500)
         .send({ success: false, message: "Failed to retrieve messages." });
+    }
+  });
+
+  fastify.get("/api/v1/message", async (request, reply) => {
+    const { free_user_id } = request.query || {};
+    console.log(
+      "🚀 ~ file: message.ts:239 ~ fastify.get ~ free_user_id:",
+      free_user_id
+    );
+    request.to;
+
+    if (!request?.token_metadata?.custom_metadata?.user_id && !free_user_id)
+      reply.send({ success: false, messages: [] });
+
+    let where = {};
+
+    if (request?.token_metadata?.custom_metadata?.user_id) {
+      where = {
+        customers: {
+          user: request?.token_metadata?.custom_metadata?.user_id,
+        },
+      };
+    }
+
+    if (free_user_id && !request?.token_metadata?.custom_metadata?.user_id) {
+      where = {
+        customers: {
+          random_user_id: free_user_id,
+        },
+      };
+    }
+
+    try {
+      const messages = await prisma.messages.findMany({
+        where,
+        orderBy: {
+          created_at: "desc",
+        },
+        take: 30,
+      });
+
+      reply.send({ success: true, messages: messages || [] });
+    } catch (error) {
+      console.log(error);
     }
   });
 

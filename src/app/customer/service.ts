@@ -4,20 +4,15 @@ import { prisma } from "../../prisma";
 // get customer information from prisma where customer_id == customerId and workspace_id == workspaceId and integration_type = integrationType and userIdentity matches to the string field  email or user_aliases values
 
 export const getCustomer = async ({
-  workspaceId,
   userIdentity,
-  randomUserIdentity,
 }: {
-  workspaceId: string;
   userIdentity: string;
 }) => {
   const customer = await prisma.customers.findFirst({
     where: {
-      workspace: workspaceId,
       OR: [
         { user: { equals: userIdentity } },
-        { email: { equals: userIdentity } },
-        { random_user_id: { equals: randomUserIdentity } },
+        { random_user_id: { equals: userIdentity } },
         // {
         //   user_alias: {
         //     path: ["username"],
@@ -57,10 +52,6 @@ export const saveCustomer = async ({
 
   if (randomUserId) {
     data.random_user_id = randomUserId;
-  }
-
-  if (userId) {
-    data.user = userId;
   }
 
   // @ts-nocheck

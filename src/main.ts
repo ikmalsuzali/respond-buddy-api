@@ -173,6 +173,7 @@ const main = async () => {
 
   server.register(fastifySchedulePlugin);
   server.register(fastifySensible);
+  server.register(require("fastify-sse-v2"));
   // ts-ignore
   server.register(require("fastify-supabase"), {
     supabaseKey: process.env.SUPABASE_KEY,

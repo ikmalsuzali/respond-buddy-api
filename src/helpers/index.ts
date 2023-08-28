@@ -61,8 +61,8 @@ export const decryptJwt = (token: string | undefined) => {
   if (!token)
     return {
       custom_metadata: {
-        user_id: "51edacbb-22d7-4f18-b1a7-d74f9f92b03d",
-        workspace_id: "21fcef2f-ba46-41b1-a4a8-400022eed3fa",
+        user_id: "",
+        workspace_id: "",
       },
     };
   let tokenJWT = token;
