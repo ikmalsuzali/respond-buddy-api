@@ -227,6 +227,22 @@ export const isObjectEmpty = (obj: any) => {
   return Object.keys(obj).length === 0;
 };
 
+export const getHighLevelObject = (obj: any) => {
+  if (typeof obj !== "object" || obj === null) {
+    return null; // Return null for non-object values or null
+  }
+
+  const highLevelObject: any = {};
+
+  for (const key in obj) {
+    if (obj.hasOwnProperty(key) && typeof obj[key] !== "object") {
+      highLevelObject[key] = obj[key];
+    }
+  }
+
+  return highLevelObject;
+};
+
 const parseStringPromise = (xmlData: string) => {
   return new Promise((resolve, reject) => {
     parseString(xmlData, (error: any, result: any) => {

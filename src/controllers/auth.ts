@@ -3,11 +3,16 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { decryptJwt, isValidEmail } from "../helpers";
 import { prisma } from "../prisma";
 import "../helpers/bigInt.js";
-import { addMetadataToToken, getValidEmails } from "../helpers/index";
+import {
+  addMetadataToToken,
+  getValidEmails,
+  getHighLevelObject,
+} from "../helpers/index";
 import {
   getNextRenewalDate,
   getTimeTillNextCreditRenewal,
 } from "../app/userWorkspaces/service";
+import jwt from "jsonwebtoken";
 
 export function authRoutes(fastify: FastifyInstance) {
   const { supabase } = fastify;
@@ -79,7 +84,7 @@ export function authRoutes(fastify: FastifyInstance) {
         email,
         password,
         confirm_password,
-        username,
+        // username,
         workspace_name,
         workspace_email,
         workspace_description,
@@ -97,15 +102,15 @@ export function authRoutes(fastify: FastifyInstance) {
         },
       });
 
-      const foundUser = await prisma.users.findFirst({
-        where: {
-          username: username,
-        },
-      });
+      // const foundUser = await prisma.users.findFirst({
+      //   where: {
+      //     username: username,
+      //   },
+      // });
 
       if (checkUniqueEmail) return new Error("Email already exists");
 
-      if (foundUser) return new Error("Username already exists");
+      // if (foundUser) return new Error("Username already exists");
 
       const { user, session, error } = await supabase.auth.signUp({
         email,
@@ -141,7 +146,7 @@ export function authRoutes(fastify: FastifyInstance) {
 
       const workspace = await prisma.workspaces.create({
         data: {
-          name: workspace_name,
+          name: workspace_name || "Personal Workspace",
           email: workspace_email || email,
           description: workspace_description || "",
         },
@@ -213,7 +218,7 @@ export function authRoutes(fastify: FastifyInstance) {
   );
 
   fastify.post(
-    "/login/facebook",
+    "/api/v1/login/facebook",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { access_token } = request.body;
 
@@ -243,31 +248,126 @@ export function authRoutes(fastify: FastifyInstance) {
   );
 
   fastify.post(
-    "/login/google",
+    "/api/v1/login/oauth",
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const { access_token } = request.body;
+      const decodedPayload = decryptJwt(request.headers.authorization);
 
-      if (!access_token) {
-        reply.badRequest("Missing access token");
-        return;
-      }
+      // find user by email
+      const foundUser = await prisma.users.findFirst({
+        where: {
+          email: decodedPayload?.email,
+        },
+        include: {
+          user_workspaces: {
+            include: {
+              workspaces: {
+                include: {
+                  subscriptions: true,
+                },
+              },
+            },
+          },
+        },
+      });
 
-      try {
-        const { user, session, error } = await supabase.auth.signIn({
-          provider: "google",
-          access_token,
+      if (foundUser) {
+        const token = addMetadataToToken(
+          request.headers.authorization.split(" ")[1],
+          fastify?.config.JWT_SECRET,
+          {
+            workspace_id: foundUser?.user_workspaces?.workspace,
+            user_id: foundUser?.id,
+          }
+        );
+
+        const user = getHighLevelObject(foundUser);
+        const userWorkspace = getHighLevelObject(foundUser.user_workspaces[0]);
+
+        reply.code(200).send({
+          user,
+          user_workspace: userWorkspace,
+          subscription:
+            foundUser.user_workspaces[0].workspaces.subscriptions[0],
+          session: token,
+        });
+      } else {
+        // if no user create user
+        const publicUser = await prisma.users.create({
+          data: {
+            email: decodedPayload?.email,
+            user_id: decodedPayload?.sub,
+            first_name: decodedPayload?.user_metadata?.name,
+          },
         });
 
-        if (error) {
-          throw error;
-        }
+        const workspace = await prisma.workspaces.create({
+          data: {
+            name: "Personal Workspace",
+            email: decodedPayload?.email,
+          },
+        });
 
-        reply
-          .code(200)
-          .header("Content-Type", "application/json; charset=utf-8")
-          .send({ user, session });
-      } catch (err) {
-        reply.badRequest(err.message);
+        const userWorkspace = await prisma.user_workspaces.create({
+          data: {
+            user: publicUser?.id,
+            workspace: workspace?.id,
+          },
+          include: {
+            workspaces: true,
+          },
+        });
+
+        // Get free subscription
+        const freeSubscription = await prisma.stripe_products.findFirst({
+          where: {
+            key: "free",
+            env: fastify.config.ENVIRONMENT === "demo" ? "demo" : "prod",
+          },
+        });
+
+        const workspaceSubscription = await prisma.subscriptions.create({
+          data: {
+            workspace: workspace?.id,
+            stripe_product: freeSubscription?.id, // Free subscription
+          },
+          include: {
+            stripe_products: true,
+          },
+        });
+
+        // Set next renewal date
+        workspaceSubscription.next_renewal_date = getNextRenewalDate(
+          workspaceSubscription
+        );
+
+        workspaceSubscription.remaining_renewal_days =
+          getTimeTillNextCreditRenewal(workspaceSubscription).days;
+
+        await prisma.workspaces.update({
+          where: {
+            id: workspace?.id,
+          },
+          data: {
+            credit_count:
+              workspaceSubscription?.stripe_products?.meta?.renewal?.monthly,
+          },
+        });
+
+        const token = addMetadataToToken(
+          request.headers.authorization.split(" ")[1],
+          fastify?.config.JWT_SECRET,
+          {
+            workspace_id: workspace?.id,
+            user_id: publicUser?.id,
+          }
+        );
+
+        reply.code(200).send({
+          user: publicUser,
+          user_workspace: userWorkspace,
+          subscription: workspaceSubscription,
+          session: token,
+        });
       }
     }
   );
