@@ -90,6 +90,7 @@ model tags {
   ai_template      String?       @db.VarChar
   key              String?       @db.VarChar
   command_type     String?       @db.VarChar
+  function         String?       @db.VarChar
   workspaces       workspaces?   @relation(fields: [workspace], references: [id], onDelete: NoAction, onUpdate: NoAction)
   rule_tags        rule_tags[]
   store_tags       store_tags[]

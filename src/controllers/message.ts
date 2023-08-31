@@ -7,10 +7,10 @@ import {
   processBasicMessageV2,
   processBasicMessageV3,
   processMessage,
+  runFunction,
   saveMessage,
 } from "../app/message/service";
 import { getCustomer, saveCustomer } from "../app/customer/service";
-import { summarizeWebsite } from "../app/function/summarizeWebsite";
 
 export function messageEvents(fastify: FastifyInstance) {
   eventManager.on("workflow", async (data: any) => {
@@ -113,6 +113,7 @@ export function messageRoutes(fastify: FastifyInstance) {
     "/api/v1/message",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { message, store_id, user_identity, metadata } = request.body || {};
+      console.log("🚀 ~ file: message.ts:116 ~ metadata:", metadata);
 
       let customer = null;
       let userIdentity =
@@ -164,8 +165,6 @@ export function messageRoutes(fastify: FastifyInstance) {
 
   fastify.get("/api/v1/message/free", async (request, reply) => {
     const { message, user_id } = request.query || {};
-    console.log("🚀 ~ file: message.ts:164 ~ fastify.post ~ user_id:", user_id);
-    console.log("🚀 ~ file: message.ts:164 ~ fastify.post ~ message:", message);
 
     try {
       let customer = null;
@@ -280,10 +279,19 @@ export function messageRoutes(fastify: FastifyInstance) {
     }
   });
 
-  fastify.get("/api/v1/function/test", async (request, reply) => {
-    const summary = await summarizeWebsite({
-      url: "https://edition.cnn.com/2023/08/21/economy/china-economy-troubles-intl-hnk/index.html",
+  fastify.post("/api/v1/function/test", async (request, reply) => {
+    const { tag_function, message, metadata } = request.body || {};
+
+    if (!tag_function || !message) {
+      reply.send({ success: false, message: "Missing parameters" });
+    }
+
+    const response = await runFunction({
+      tagFunction: tag_function,
+      message,
+      metadata,
     });
-    reply.send({ success: true, message: summary });
+
+    reply.send({ success: true, message: response });
   });
 }

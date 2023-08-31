@@ -190,7 +190,8 @@ export function workspaceRoutes(fastify: FastifyInstance) {
     });
     console.log(
       "🚀 ~ file: workspaces.ts:191 ~ fastify.get ~ workspaceCredit:",
-      workspaceCredit
+      workspaceCredit,
+      request?.token_metadata?.custom_metadata.workspace_id
     );
 
     reply.send({ credit: workspaceCredit.credit_count || 0 });

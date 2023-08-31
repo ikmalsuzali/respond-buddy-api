@@ -16,6 +16,7 @@ import { multiPromptChain } from "../gpt/service";
 import { getDocs } from "../qdrant/service";
 import { HumanMessage } from "langchain/schema";
 import { summarizeWebsite } from "../function/summarizeWebsite";
+import { getBrokenLinks } from "../function/findAllWebsiteLinks";
 
 export const processMessage = async ({
   message,
@@ -340,15 +341,6 @@ export const processBasicMessageV3 = async ({
   }
 };
 
-const runFunction = async (tagFunction, message, metadata) => {
-  const functionMapper = {
-    "summarize-website": summarizeWebsite({ message, metadata }),
-  };
-
-  // Run function based on tag function
-  let response = await functionMapper[tagFunction]();
-};
-
 export const saveMessage = async ({
   message,
   customerId,
@@ -406,4 +398,16 @@ const replaceInputWithValue = (
   const pattern = /\[input\]/g;
   const replacedString = inputString.replace(pattern, replacementValue);
   return replacedString || "";
+};
+
+export const runFunction = async ({ tagFunction, message, metadata }) => {
+  const functionMapper = {
+    // "summarize-website": summarizeWebsite({ message, metadata }),
+    "find-broken-url": getBrokenLinks({ message, metadata }),
+  };
+
+  // Run function based on tag function
+  let response = await functionMapper[tagFunction];
+
+  return response;
 };
