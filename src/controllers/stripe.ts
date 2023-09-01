@@ -44,9 +44,8 @@ export function stripeRoutes(fastify: FastifyInstance) {
   fastify.post(
     "/api/v1/checkout-session",
     async (request: FastifyRequest, reply: FastifyReply) => {
-      let { plan_id, additional_prices = [] } = request.body;
+      let { plan_id, url, additional_prices = [] } = request.body;
 
-      const url = fastify?.config.BASE_URL;
       console.log("url", url);
       console.log("🚀 ~ file: stripe.ts:48 ~ price_id:", plan_id);
 
