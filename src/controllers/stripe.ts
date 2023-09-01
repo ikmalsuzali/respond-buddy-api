@@ -174,6 +174,22 @@ export function stripeRoutes(fastify: FastifyInstance) {
     }
   );
 
+  fastify.get(
+    "/api/v1/payment/:id",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      let payment = await prisma.payments.findUnique({
+        where: {
+          id: request.params.id,
+        },
+        include: {
+          stripe_products: true,
+        },
+      });
+
+      return reply.send(payment);
+    }
+  );
+
   const handlePaymentIntentSucceeded = async (paymentIntent) => {
     logger.info({ type: "paymentIntent", data: paymentIntent });
     // CHECK IF THE PAYMENT INTENT status key is success or failed
