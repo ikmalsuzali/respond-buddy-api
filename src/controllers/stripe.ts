@@ -4,19 +4,18 @@ import { FastifyInstance, FastifyRequest } from "fastify";
 import Stripe from "stripe";
 import { prisma } from "../prisma";
 import "../helpers/bigInt.js";
-import { logger } from "../main";
 import { getAddOnCreditsTillNextSubscriptionRenewal } from "../app/userWorkspaces/service";
 
 export function stripeRoutes(fastify: FastifyInstance) {
-  const enviroment = fastify?.config.ENVIRONMENT;
+  const environment = fastify?.config.ENVIRONMENT;
 
   const stripeEndpoint =
-    enviroment == "production"
+    environment == "production"
       ? fastify?.config.STRIPE_WEBHOOK_LIVE
       : fastify?.config.STRIPE_WEBHOOK_DEMO;
 
   const stripeSecret =
-    enviroment == "production"
+    environment == "production"
       ? fastify?.config.STRIPE_SECRET_LIVE
       : fastify?.config.STRIPE_SECRET_DEMO;
 
@@ -32,7 +31,7 @@ export function stripeRoutes(fastify: FastifyInstance) {
   fastify.get("/api/v1/stripe/products", async (request, reply) => {
     let products = await prisma.stripe_products.findMany({
       where: {
-        env: enviroment == "production" ? "live" : "demo",
+        env: environment == "production" ? "live" : "demo",
       },
       orderBy: {
         order: "asc",
