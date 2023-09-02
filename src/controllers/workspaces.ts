@@ -156,6 +156,7 @@ export function workspaceRoutes(fastify: FastifyInstance) {
       const workspaceSubscription = await prisma.subscriptions.findFirst({
         where: {
           workspace: request?.token_metadata?.custom_metadata.workspace_id,
+          is_deleted: false,
         },
         include: {
           stripe_products: true,
@@ -166,14 +167,14 @@ export function workspaceRoutes(fastify: FastifyInstance) {
         workspaceSubscription
       );
 
+      if (!workspaceSubscription) return Error("No subscriptions found");
+
       workspaceSubscription.next_renewal_date = getNextRenewalDate(
         workspaceSubscription
       );
 
       workspaceSubscription.remaining_renewal_days =
         getTimeTillNextCreditRenewal(workspaceSubscription).days;
-
-      if (!workspaceSubscription) return Error("No subscriptions found");
 
       reply.send(workspaceSubscription);
     }

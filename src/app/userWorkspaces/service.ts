@@ -90,6 +90,43 @@ export const getTimeTillNextCreditRenewal = (subscription: any) => {
   };
 };
 
+export const getTotalMonthsTillNextSubscriptionRenewal = (
+  subscription: any,
+  stripeProduct: any
+) => {
+  // Get the time till next subscription renewal and round to the nearest month rounding with floor
+  const now = new Date();
+  const createdAt = new Date(subscription.created_at);
+
+  // Adjust the month of createdAt to the next month
+  createdAt.setMonth(
+    createdAt.getMonth() + stripeProduct.plan_type === "YEARLY" ? 12 : 1
+  );
+
+  // Calculate the difference in time
+  const timeDiff = createdAt.getTime() - now.getTime();
+
+  // Return the difference in various units
+  return {
+    milliseconds: timeDiff,
+    seconds: Math.floor(timeDiff / 1000),
+    minutes: Math.floor(timeDiff / (1000 * 60)),
+    hours: Math.floor(timeDiff / (1000 * 60 * 60)),
+    days: Math.floor(timeDiff / (1000 * 60 * 60 * 24)),
+    months: Math.floor(timeDiff / (1000 * 60 * 60 * 24 * 30)),
+  };
+};
+
+export const getAddOnCreditsTillNextSubscriptionRenewal = (
+  subscription: any,
+  stripeProduct: any
+) => {
+  return Math.abs(
+    getTotalMonthsTillNextSubscriptionRenewal(subscription, stripeProduct)
+      .months * stripeProduct?.meta?.renewal?.monthly || 0
+  );
+};
+
 export const getNextRenewalDate = (subscription: any) => {
   const createdAt = new Date(subscription.created_at);
 

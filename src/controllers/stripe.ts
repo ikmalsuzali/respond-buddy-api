@@ -5,19 +5,20 @@ import Stripe from "stripe";
 import { prisma } from "../prisma";
 import "../helpers/bigInt.js";
 import { logger } from "../main";
+import { getAddOnCreditsTillNextSubscriptionRenewal } from "../app/userWorkspaces/service";
 
 export function stripeRoutes(fastify: FastifyInstance) {
+  const enviroment = fastify?.config.ENVIRONMENT;
+
   const stripeEndpoint =
-    fastify?.config.ENVIRONMENT == "production"
+    enviroment == "production"
       ? fastify?.config.STRIPE_WEBHOOK_LIVE
       : fastify?.config.STRIPE_WEBHOOK_DEMO;
 
   const stripeSecret =
-    fastify?.config.ENVIRONMENT == "production"
+    enviroment == "production"
       ? fastify?.config.STRIPE_SECRET_LIVE
       : fastify?.config.STRIPE_SECRET_DEMO;
-
-  const enviroment = fastify?.config.ENVIRONMENT;
 
   const stripeClient = new Stripe(stripeSecret, {
     apiVersion: "2023-08-16",
@@ -29,10 +30,9 @@ export function stripeRoutes(fastify: FastifyInstance) {
   };
 
   fastify.get("/api/v1/stripe/products", async (request, reply) => {
-    console.log("env", enviroment);
     let products = await prisma.stripe_products.findMany({
       where: {
-        env: fastify?.config.ENVIRONMENT == "production" ? "live" : "demo",
+        env: enviroment == "production" ? "live" : "demo",
       },
       orderBy: {
         order: "asc",
@@ -44,28 +44,129 @@ export function stripeRoutes(fastify: FastifyInstance) {
   fastify.post(
     "/api/v1/checkout-session",
     async (request: FastifyRequest, reply: FastifyReply) => {
-      let { plan_id, url, additional_prices = [] } = request.body;
+      let { plan_id, url, remarks = "", additional_prices = [] } = request.body;
+
+      if (!plan_id) reply.status(400).send({ message: "No plan found" });
 
       console.log("url", url);
       console.log("🚀 ~ file: stripe.ts:48 ~ price_id:", plan_id);
 
       try {
-        let payment = await getFirstPaymentSuccess(
-          request?.token_metadata?.custom_metadata?.workspace_id
-        );
-        if (payment) {
-          return reply
-            .status(400)
-            .send({ message: "Payment has been made already" });
-        }
-
         let paymentResponse = null;
 
         let stripeProduct = await prisma.stripe_products.findFirst({
           where: {
             stripe_price_id: plan_id,
           },
+          include: {
+            subscriptions: {
+              where: {
+                is_deleted: false,
+              },
+            },
+          },
         });
+
+        if (plan_id == "free") {
+          // Find all subscriptions for the workspace
+          const subscriptions = await prisma.subscriptions.findMany({
+            where: {
+              workspace: request?.token_metadata?.custom_metadata?.workspace_id,
+              is_deleted: false,
+            },
+          });
+
+          // Delete all stripe subscriptions
+          if (subscriptions.length > 0) {
+            let stripeSubscriptions = subscriptions.filter(
+              (subscription) => subscription.stripe_subscription_id !== null
+            );
+
+            for (const subscription of stripeSubscriptions) {
+              const stripeSubscription =
+                await stripeClient.subscriptions.retrieve(
+                  subscription.stripe_subscription_id
+                );
+              if (
+                stripeSubscription &&
+                stripeSubscription.status !== "canceled"
+              ) {
+                stripeClient.subscriptions.del(
+                  subscription.stripe_subscription_id
+                );
+              }
+            }
+          }
+
+          // Find current subscription and update the remarks
+          const currentSubscription = subscriptions?.find(
+            (subscription) => subscription.is_deleted == false
+          );
+          if (currentSubscription) {
+            const updatedSubscription = await prisma.subscriptions.update({
+              where: {
+                id: currentSubscription.id,
+              },
+              data: {
+                remarks: remarks,
+              },
+              include: {
+                stripe_products: true,
+                workspaces: true,
+              },
+            });
+
+            const updateCredits = await prisma.workspaces.update({
+              where: {
+                id: request?.token_metadata?.custom_metadata?.workspace_id,
+              },
+              data: {
+                credit_addon_count: {
+                  increment: getAddOnCreditsTillNextSubscriptionRenewal(
+                    updatedSubscription,
+                    updatedSubscription?.stripe_products
+                  ),
+                },
+                credit_count:
+                  updatedSubscription?.stripe_products?.meta?.renewal?.monthly
+                    ?.credit || 100,
+              },
+            });
+          }
+
+          // Delete all subscriptions
+
+          const deletedSubscription = await prisma.subscriptions.updateMany({
+            where: {
+              workspace: request?.token_metadata?.custom_metadata?.workspace_id,
+            },
+            data: {
+              is_deleted: true,
+            },
+          });
+
+          // Create new subscription
+          const newSubscription = await prisma.subscriptions.create({
+            data: {
+              workspace: request?.token_metadata?.custom_metadata?.workspace_id,
+              stripe_product: stripeProduct?.id,
+              is_deleted: false,
+            },
+          });
+
+          reply.send({
+            message: "Successfully downgraded",
+            stripe_url: `${url}/apps/pricings`,
+          });
+        }
+
+        console.log(stripeProduct);
+
+        if (stripeProduct && stripeProduct.subscriptions.length > 0)
+          return reply.status(400).send({
+            message:
+              "You are already on the current subscription, you can always move up to a higher plan",
+          });
 
         if (!stripeProduct)
           return reply.status(400).send({ message: "No stripe product found" });
@@ -101,6 +202,9 @@ export function stripeRoutes(fastify: FastifyInstance) {
             metadata: {
               client_reference_id: paymentResponse?.id,
               user_id: request?.token_metadata?.custom_metadata?.user_id,
+              workspace_id:
+                request?.token_metadata?.custom_metadata.workspace_id,
+              db_stripe_product_id: stripeProduct?.id,
             },
           },
           client_reference_id: paymentResponse?.id,
@@ -154,7 +258,7 @@ export function stripeRoutes(fastify: FastifyInstance) {
       const paymentIntent = event?.data.object;
 
       switch (event?.type) {
-        case "payment_intent.succeeded":
+        case "invoice.payment_succeeded":
           // Then define and call a method to handle the successful payment intent.
           await handlePaymentIntentSucceeded(paymentIntent);
           break;
@@ -191,38 +295,89 @@ export function stripeRoutes(fastify: FastifyInstance) {
   );
 
   const handlePaymentIntentSucceeded = async (paymentIntent) => {
-    logger.info({ type: "paymentIntent", data: paymentIntent });
     // CHECK IF THE PAYMENT INTENT status key is success or failed
     try {
-      await prisma.payments.update({
-        where: {
-          id: paymentIntent?.metadata?.client_reference_id,
-        },
-        data: {
-          status: 1,
-          stripe_payment_intent_id: paymentIntent?.id,
-          receipt_url: paymentIntent?.charges?.data[0].receipt_url,
-        },
-      });
+      console.log("payment successful intent");
 
       // Delete all older subscriptions
-      await prisma.subscriptions.updateMany({
+      const deletedSubscription = await prisma.subscriptions.updateMany({
         where: {
-          workspace: paymentIntent?.metadata?.workspace_id,
+          workspace: paymentIntent?.subscription_details.metadata?.workspace_id,
         },
         data: {
           is_deleted: true,
         },
       });
+      console.log(
+        "🚀 ~ file: stripe.ts:220 ~ handlePaymentIntentSucceeded ~ subscription:",
+        deletedSubscription
+      );
 
-      await prisma.subscriptions.create({
+      const subscribedProducts = await prisma.subscriptions.findMany({
+        where: {
+          workspace: paymentIntent?.subscription_details.metadata?.workspace_id,
+          stripe_subscription_id: {
+            not: null,
+          },
+        },
+      });
+
+      if (subscribedProducts.length > 0) {
+        for (const subscription of subscribedProducts) {
+          const stripeSubscription = await stripeClient.subscriptions.retrieve(
+            subscription.stripe_subscription_id
+          );
+          if (stripeSubscription && stripeSubscription.status !== "canceled") {
+            stripeClient.subscriptions.del(subscription.stripe_subscription_id);
+          }
+        }
+      }
+
+      const subscription = await prisma.subscriptions.create({
         data: {
-          workspace: paymentIntent?.metadata?.workspace_id,
-          stripe_product: paymentIntent?.metadata?.stripe_product_id,
+          workspace:
+            paymentIntent?.subscription_details?.metadata?.workspace_id,
+          stripe_subscription_id: paymentIntent?.subscription,
+          stripe_product:
+            paymentIntent?.subscription_details?.metadata?.db_stripe_product_id,
+          is_deleted: false,
+        },
+        include: {
+          stripe_products: true,
+          workspaces: true,
+        },
+      });
+
+      const updateCredits = await prisma.workspaces.update({
+        where: {
+          id: paymentIntent?.subscription_details?.metadata?.workspace_id,
+        },
+        data: {
+          credit_addon_count: {
+            increment:
+              getAddOnCreditsTillNextSubscriptionRenewal(
+                subscription,
+                subscription?.stripe_products
+              ) || 0,
+          },
+          credit_count:
+            subscription?.stripe_products?.meta?.renewal?.monthly || 100,
+        },
+      });
+
+      const payment = await prisma.payments.update({
+        where: {
+          id: paymentIntent?.subscription_details?.metadata
+            ?.client_reference_id,
+        },
+        data: {
+          status: 1,
+          stripe_payment_intent_id: paymentIntent?.id,
+          receipt_url: paymentIntent?.hosted_invoice_url,
         },
       });
     } catch (error) {
-      logger.error({ type: "paymentIntent", data: error });
+      console.log("337: webhook error", error);
     }
   };
 

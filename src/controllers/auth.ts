@@ -12,7 +12,6 @@ import {
   getNextRenewalDate,
   getTimeTillNextCreditRenewal,
 } from "../app/userWorkspaces/service";
-import jwt from "jsonwebtoken";
 
 export function authRoutes(fastify: FastifyInstance) {
   const { supabase } = fastify;
@@ -252,122 +251,128 @@ export function authRoutes(fastify: FastifyInstance) {
     async (request: FastifyRequest, reply: FastifyReply) => {
       const decodedPayload = decryptJwt(request.headers.authorization);
 
-      // find user by email
-      const foundUser = await prisma.users.findFirst({
-        where: {
-          email: decodedPayload?.email,
-        },
-        include: {
-          user_workspaces: {
-            include: {
-              workspaces: {
-                include: {
-                  subscriptions: true,
+      try {
+        // find user by email
+        const foundUser = await prisma.users.findFirst({
+          where: {
+            email: decodedPayload?.email,
+          },
+          include: {
+            user_workspaces: {
+              include: {
+                workspaces: {
+                  include: {
+                    subscriptions: true,
+                  },
                 },
               },
             },
           },
-        },
-      });
-
-      if (foundUser) {
-        const token = addMetadataToToken(
-          request.headers.authorization.split(" ")[1],
-          fastify?.config.JWT_SECRET,
-          {
-            workspace_id: foundUser?.user_workspaces?.workspace,
-            user_id: foundUser?.id,
-          }
-        );
-
-        const user = getHighLevelObject(foundUser);
-        const userWorkspace = getHighLevelObject(foundUser.user_workspaces[0]);
-
-        reply.code(200).send({
-          user,
-          user_workspace: userWorkspace,
-          subscription:
-            foundUser.user_workspaces[0].workspaces.subscriptions[0],
-          session: token,
-        });
-      } else {
-        // if no user create user
-        const publicUser = await prisma.users.create({
-          data: {
-            email: decodedPayload?.email,
-            user_id: decodedPayload?.sub,
-            first_name: decodedPayload?.user_metadata?.name,
-          },
         });
 
-        const workspace = await prisma.workspaces.create({
-          data: {
-            name: "Personal Workspace",
-            email: decodedPayload?.email,
-          },
-        });
+        if (foundUser) {
+          const token = addMetadataToToken(
+            request.headers.authorization.split(" ")[1],
+            fastify?.config.JWT_SECRET,
+            {
+              workspace_id: foundUser?.user_workspaces[0]?.workspace,
+              user_id: foundUser?.id,
+            }
+          );
 
-        const userWorkspace = await prisma.user_workspaces.create({
-          data: {
-            user: publicUser?.id,
-            workspace: workspace?.id,
-          },
-          include: {
-            workspaces: true,
-          },
-        });
+          const user = getHighLevelObject(foundUser);
+          const userWorkspace = getHighLevelObject(
+            foundUser.user_workspaces[0]
+          );
 
-        // Get free subscription
-        const freeSubscription = await prisma.stripe_products.findFirst({
-          where: {
-            key: "free",
-            env: fastify.config.ENVIRONMENT === "demo" ? "demo" : "prod",
-          },
-        });
+          reply.code(200).send({
+            user,
+            user_workspace: userWorkspace,
+            subscription:
+              foundUser.user_workspaces[0].workspaces.subscriptions[0],
+            session: token,
+          });
+        } else {
+          // if no user create user
+          const publicUser = await prisma.users.create({
+            data: {
+              email: decodedPayload?.email,
+              user_id: decodedPayload?.sub,
+              first_name: decodedPayload?.user_metadata?.name,
+            },
+          });
 
-        const workspaceSubscription = await prisma.subscriptions.create({
-          data: {
-            workspace: workspace?.id,
-            stripe_product: freeSubscription?.id, // Free subscription
-          },
-          include: {
-            stripe_products: true,
-          },
-        });
+          const workspace = await prisma.workspaces.create({
+            data: {
+              name: "Personal Workspace",
+              email: decodedPayload?.email,
+            },
+          });
 
-        // Set next renewal date
-        workspaceSubscription.next_renewal_date = getNextRenewalDate(
-          workspaceSubscription
-        );
+          const userWorkspace = await prisma.user_workspaces.create({
+            data: {
+              user: publicUser?.id,
+              workspace: workspace?.id,
+            },
+            include: {
+              workspaces: true,
+            },
+          });
 
-        workspaceSubscription.remaining_renewal_days =
-          getTimeTillNextCreditRenewal(workspaceSubscription).days;
+          // Get free subscription
+          const freeSubscription = await prisma.stripe_products.findFirst({
+            where: {
+              key: "free",
+              env: fastify.config.ENVIRONMENT === "demo" ? "demo" : "prod",
+            },
+          });
 
-        await prisma.workspaces.update({
-          where: {
-            id: workspace?.id,
-          },
-          data: {
-            credit_count:
-              workspaceSubscription?.stripe_products?.meta?.renewal?.monthly,
-          },
-        });
+          const workspaceSubscription = await prisma.subscriptions.create({
+            data: {
+              workspace: workspace?.id,
+              stripe_product: freeSubscription?.id, // Free subscription
+            },
+            include: {
+              stripe_products: true,
+            },
+          });
 
-        const token = addMetadataToToken(
-          request.headers.authorization.split(" ")[1],
-          fastify?.config.JWT_SECRET,
-          {
-            workspace_id: workspace?.id,
-            user_id: publicUser?.id,
-          }
-        );
+          // Set next renewal date
+          workspaceSubscription.next_renewal_date = getNextRenewalDate(
+            workspaceSubscription
+          );
 
-        reply.code(200).send({
-          user: publicUser,
-          user_workspace: userWorkspace,
-          subscription: workspaceSubscription,
-          session: token,
-        });
+          workspaceSubscription.remaining_renewal_days =
+            getTimeTillNextCreditRenewal(workspaceSubscription).days;
+
+          await prisma.workspaces.update({
+            where: {
+              id: workspace?.id,
+            },
+            data: {
+              credit_count:
+                workspaceSubscription?.stripe_products?.meta?.renewal?.monthly,
+            },
+          });
+
+          const token = addMetadataToToken(
+            request.headers.authorization.split(" ")[1],
+            fastify?.config.JWT_SECRET,
+            {
+              workspace_id: workspace?.id,
+              user_id: publicUser?.id,
+            }
+          );
+
+          reply.code(200).send({
+            user: publicUser,
+            user_workspace: userWorkspace,
+            subscription: workspaceSubscription,
+            session: token,
+          });
+        }
+      } catch (error) {
+        console.log("error", error);
       }
     }
   );
