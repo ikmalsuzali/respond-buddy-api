@@ -10,12 +10,12 @@ export const getWebsiteLinks = async ({
   message,
   metadata = {
     html: "",
-    has_success_links: false,
-    has_broken_links: false,
+    link_type: "all",
   },
 }: {
   message: string;
   metadata: any;
+  link_type: "all" | "success" | "error";
 }) => {
   try {
     const messageUrl = extractFirstURL(message);
@@ -32,6 +32,19 @@ export const getWebsiteLinks = async ({
 
     const allLinks = $("a");
     const linkPromises = [];
+
+    //
+    if (metadata.link_type === "all") {
+      const links: any = [];
+      allLinks.each((_, element) => {
+        const link = $(element);
+        const href = link.attr("href");
+        if (href && !href.startsWith("#") && isValidURL(href)) {
+          links.push(href);
+        }
+      });
+      return JSON.stringify(links);
+    }
 
     for (let i = 0; i < allLinks.length; i++) {
       const link = $(allLinks[i]);
@@ -62,17 +75,15 @@ export const getWebsiteLinks = async ({
     let brokenLinks: any[] = [];
     let successLinks: any[] = [];
 
-    if (metadata.has_success_links || metadata.has_broken_links) {
+    if (metadata.link_type === "error" || metadata.link_type === "success") {
       let links = await Promise.all(linkPromises);
       brokenLinks = links?.filter((link) => link.status == "error");
       successLinks = links?.filter((link) => link.status == 200);
     }
 
-    return {
-      links: allLinks,
-      successLinks: successLinks,
-      brokenLinks: brokenLinks,
-    };
+    if (metadata.link_type === "error") return JSON.stringify(brokenLinks);
+    if (metadata.link_type === "success") return JSON.stringify(successLinks);
+    return JSON.stringify([]);
   } catch (error) {
     console.error("Error fetching the webpage:", error);
   }

@@ -105,7 +105,89 @@ export function messageEvents(fastify: FastifyInstance) {
     }
   );
 
-  eventManager.on("save-customer", async (data: any) => {});
+  eventManager.on("send-message", async (data: any) => {
+    const { message, botResponse, store_id, user_identity, request } = data;
+
+    let customer = null;
+    const userIdentity =
+      user_identity ||
+      request?.token_metadata?.custom_metadata?.user_id ||
+      null;
+
+    const workspaceId =
+      request?.token_metadata?.custom_metadata?.workspace_id || null;
+
+    // Get/Save customer information
+    customer = await getCustomer({
+      workspaceId,
+      userIdentity,
+    });
+
+    if (!customer) {
+      // Save customer
+      const randomUserId = userIdentity;
+      const userId = request?.token_metadata?.custom_metadata?.user_id || null;
+
+      customer = await saveCustomer({
+        workspaceId,
+        randomUserId,
+        userId,
+      });
+    }
+
+    // Send user message
+    const userMessage = await saveMessage({
+      message,
+      customerId: customer?.id,
+      storeId: store_id,
+    });
+
+    // Send bot message
+    await saveMessage({
+      message: botResponse,
+      storeId: store_id,
+      originalMessageId: userMessage.id,
+    });
+  });
+
+  eventManager.on("deduct-credit", async (data: any) => {
+    let { workspaceId } = data || {};
+
+    if (!workspaceId) return;
+
+    const workspace = await prisma.workspaces.findFirst({
+      where: {
+        id: workspaceId,
+      },
+    });
+
+    if (!workspace) return;
+
+    // Deduct the credit_addon_count by 1 if credit_addon_count is less than and equal to 0 than deduct credit_count
+    if (workspace.credit_addon_count > 0) {
+      await prisma.workspaces.update({
+        where: {
+          id: workspaceId,
+        },
+        data: {
+          credit_addon_count: {
+            decrement: 1,
+          },
+        },
+      });
+    } else {
+      await prisma.workspaces.update({
+        where: {
+          id: workspaceId,
+        },
+        data: {
+          credit_count: {
+            decrement: 1,
+          },
+        },
+      });
+    }
+  });
 }
 
 export function messageRoutes(fastify: FastifyInstance) {
@@ -113,51 +195,30 @@ export function messageRoutes(fastify: FastifyInstance) {
     "/api/v1/message",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { message, store_id, user_identity, metadata } = request.body || {};
-      console.log("🚀 ~ file: message.ts:116 ~ metadata:", metadata);
 
-      let customer = null;
-      let userIdentity =
-        user_identity || request?.token_metadata?.custom_metadata?.user_id;
-      // Get/Save customer information
-      customer = await getCustomer({
-        workspaceId:
-          request?.token_metadata?.custom_metadata?.workspace_id || null,
-        userIdentity,
-      });
-      if (!customer) {
-        // Save customer
-        customer = await saveCustomer({
-          workspaceId:
-            request?.token_metadata?.custom_metadata?.workspace_id || null,
-          randomUserId: userIdentity,
-          userId: request?.token_metadata?.custom_metadata?.user_id || null,
-        });
-      }
-
-      const userMessage = await saveMessage({
-        message: message,
-        customerId: customer?.id,
-        storeId: store_id,
-      });
-
-      const response = await processBasicMessageV2({
+      const botResponse = await processBasicMessageV2({
         message: message,
         workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
         storeId: store_id,
         tagKey: metadata?.tag_key,
       });
 
-      await saveMessage({
-        message: response,
-        storeId: store_id,
-        originalMessageId: userMessage.id,
+      eventManager.emit("send-message", {
+        message: message,
+        response: botResponse,
+        store_id: store_id,
+        user_identity: user_identity,
+        request: request,
+      });
+
+      eventManager.emit("deduct-credit", {
+        workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
       });
 
       reply.send({
         success: true,
         data: {
-          message: response,
-          customer: customer?.id,
+          message: botResponse,
         },
       });
     }

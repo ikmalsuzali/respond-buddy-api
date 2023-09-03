@@ -16,7 +16,7 @@ import { multiPromptChain } from "../gpt/service";
 import { getDocs } from "../qdrant/service";
 import { HumanMessage } from "langchain/schema";
 import { summarizeWebsite } from "../function/summarizeWebsite";
-import { getBrokenLinks } from "../function/findAllWebsiteLinks";
+import { getWebsiteLinks } from "../function/findAllWebsiteLinks";
 
 export const processMessage = async ({
   message,
@@ -174,6 +174,74 @@ export const processBasicMessageV2 = async ({
   const chat = new ChatOpenAI({});
 
   if (!message) throw new Error("Message is empty");
+
+  // Get all tags that workspace and is_system_tag = true
+  const tags = await prisma.tags.findMany({
+    where: {
+      OR: [{ is_system_tag: true }, { workspace: workspaceId }],
+    },
+  });
+
+  let matchedTag = {};
+  let lowercaseMessage = message.toLowerCase();
+
+  tags.forEach(async (tag) => {
+    if (!tag.base_message || !tag.base_message.length) return;
+    tag.base_message.forEach((baseMessage: string) => {
+      if (lowercaseMessage.includes(baseMessage)) {
+        matchedTag = tag;
+        return;
+      }
+    });
+    if (matchedTag.id) return;
+  });
+
+  if (matchedTag.id) {
+    if (workspaceId && tag.command_type === "respond") {
+      let similarDoc = await getDocs({
+        message,
+        key: workspaceId,
+        similarityCount: 1,
+        filter: {
+          should: [
+            {
+              key: "metadata.workspace_id",
+              match: {
+                value: workspaceId,
+              },
+            },
+          ],
+        },
+      });
+
+      if (similarDoc?.[0]) {
+        const result = await chat.predict(
+          `Answer this: ${message} using this information: ${similarDoc?.[0].pageContent}`
+        );
+
+        return result;
+      }
+    }
+
+    if (matchedTag.function) {
+      const functionResponse = await runFunction({
+        tagFunction: tag_function,
+        message,
+        metadata,
+      });
+
+      return functionResponse;
+    }
+
+    let cleanTemplate = message;
+    if (tag?.ai_template) {
+      cleanTemplate = replaceInputWithValue(tag?.ai_template, message);
+
+      const result = await chat.predict(cleanTemplate);
+      return result;
+    }
+  }
+
   if (tagKey) {
     // Check if tag has a key
     const tag = await prisma.tags.findFirst({
@@ -217,7 +285,6 @@ export const processBasicMessageV2 = async ({
       }
 
       const result = await chat.predict(cleanTemplate);
-
       return result;
 
       // If no tag exists, use qdrant to find similar tags
@@ -401,13 +468,32 @@ const replaceInputWithValue = (
 };
 
 export const runFunction = async ({ tagFunction, message, metadata }) => {
-  const functionMapper = {
-    // "summarize-website": summarizeWebsite({ message, metadata }),
-    "find-broken-url": getBrokenLinks({ message, metadata }),
-  };
-
-  // Run function based on tag function
-  let response = await functionMapper[tagFunction];
-
-  return response;
+  if (!tagFunction) return "Sorry, I cannot run this now.";
+  switch (tagFunction) {
+    case "find-all-website-links":
+      return await getWebsiteLinks({
+        message,
+        metadata: {
+          link_type: "all",
+        },
+      });
+    case "find-all-success-website-links":
+      return await getWebsiteLinks({
+        message,
+        metadata: {
+          link_type: "success",
+        },
+      });
+    case "find-all-error-website-links":
+      return await getWebsiteLinks({
+        message,
+        metadata: {
+          link_type: "error",
+        },
+      });
+    case "summarize-website":
+      return await summarizeWebsite({ message, metadata });
+    default:
+      return "Sorry, I cannot run this now.";
+  }
 };

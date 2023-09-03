@@ -21,7 +21,9 @@ const targetId = "center_col";
 
 export const summarizeWebsite = async ({
   message,
-  metadata,
+  metadata = {
+    url_body_content: "",
+  },
 }: {
   message: string;
   metadata: any;
@@ -29,20 +31,25 @@ export const summarizeWebsite = async ({
   try {
     const messageUrl = extractFirstURL(message);
     let url = messageUrl || metadata.current_url;
+    let data = metadata.url_body_content;
 
     if (!url) return { status: "error", message: "No url found" };
 
-    const { data } = await axios.get(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36",
-      },
-    });
+    if (!url_body_content) {
+      let axiosData = await axios.get(url, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36",
+        },
+      });
+      data = axiosData.data;
+    }
 
     let $ = cheerio.load(data);
 
     // Remove elements that are likely part of the navbar, menu, or sidebar
     $ = removeExtraElements($);
+    $ = removeForm($);
     $ = removeCss($);
     $ = removeExtraElements($);
     $ = removeScripts($);
@@ -99,7 +106,7 @@ export const extractFirstURL = (message) => {
 
 const removeExtraElements = (cheerio: cheerio.CheerioAPI) => {
   cheerio(
-    '[class*="navbar" i], [class*="nav" i], [class*="menu" i], [class*="header" i], [class*="sidebar" i], [class*="aside" i]'
+    '[class*="navbar" i], [class*="nav" i], [class*="menu" i], [class*="header" i], [class*="sidebar" i], [class*="aside" i], [class*="footer" i]'
   ).remove();
   return cheerio;
 };
@@ -113,6 +120,11 @@ const removeCss = (cheerio: cheerio.CheerioAPI) => {
 
 const removeScripts = (cheerio: cheerio.CheerioAPI) => {
   cheerio("script").remove();
+  return cheerio;
+};
+
+const removeForm = (cheerio: cheerio.CheerioAPI) => {
+  cheerio('[class*="form" i]').remove();
   return cheerio;
 };
 
