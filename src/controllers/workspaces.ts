@@ -195,6 +195,6 @@ export function workspaceRoutes(fastify: FastifyInstance) {
       request?.token_metadata?.custom_metadata.workspace_id
     );
 
-    reply.send({ credit: workspaceCredit.credit_count || 0 });
+    reply.send({ credits: workspaceCredit.credit_count || 0 });
   });
 }
