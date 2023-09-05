@@ -30,12 +30,12 @@ export const summarizeWebsite = async ({
 }) => {
   try {
     const messageUrl = extractFirstURL(message);
-    let url = messageUrl || metadata.current_url;
+    let url = messageUrl || metadata.current_website_url;
     let data = metadata.url_body_content;
 
-    if (!url) return { status: "error", message: "No url found" };
+    if (!url && !data) return { status: "error", message: "No url found" };
 
-    if (!url_body_content) {
+    if (!metadata.url_body_content) {
       let axiosData = await axios.get(url, {
         headers: {
           "User-Agent":

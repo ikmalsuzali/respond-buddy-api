@@ -22,10 +22,12 @@ export const processMessage = async ({
   message,
   workspaceId,
   storeId,
+  metadata,
 }: {
   message: string;
   workspaceId: string;
   storeId?: string;
+  metadata?: any;
 }) => {
   if (!message) throw new Error("Message is empty");
   if (!workspaceId) throw new Error("Workspace is empty");
@@ -163,13 +165,15 @@ export const processBasicMessage = async ({
 export const processBasicMessageV2 = async ({
   message,
   workspaceId,
+  storeIds = [],
   tagKey,
-  meta,
+  metadata,
 }: {
   message: string;
   workspaceId?: string;
+  storeIds?: string[];
   tagKey?: string;
-  meta?: any;
+  metadata?: any;
 }) => {
   const chat = new ChatOpenAI({});
 
@@ -187,17 +191,22 @@ export const processBasicMessageV2 = async ({
 
   tags.forEach(async (tag) => {
     if (!tag.base_message || !tag.base_message.length) return;
-    tag.base_message.forEach((baseMessage: string) => {
+    if (matchedTag.id) return;
+
+    tag.base_message.forEach((baseMessage) => {
+      if (matchedTag.id) return;
+      baseMessage = baseMessage.toLowerCase();
       if (lowercaseMessage.includes(baseMessage)) {
         matchedTag = tag;
         return;
       }
     });
+
     if (matchedTag.id) return;
   });
 
   if (matchedTag.id) {
-    if (workspaceId && tag.command_type === "respond") {
+    if (workspaceId && matchedTag.command_type === "respond") {
       let similarDoc = await getDocs({
         message,
         key: workspaceId,
@@ -216,7 +225,7 @@ export const processBasicMessageV2 = async ({
 
       if (similarDoc?.[0]) {
         const result = await chat.predict(
-          `Answer this: ${message} using this information: ${similarDoc?.[0].pageContent}`
+          `Answer this: ${message}, using this information: ${similarDoc?.[0].pageContent}`
         );
 
         return result;
@@ -225,7 +234,7 @@ export const processBasicMessageV2 = async ({
 
     if (matchedTag.function) {
       const functionResponse = await runFunction({
-        tagFunction: tag_function,
+        tagFunction: matchedTag.function,
         message,
         metadata,
       });
@@ -234,8 +243,8 @@ export const processBasicMessageV2 = async ({
     }
 
     let cleanTemplate = message;
-    if (tag?.ai_template) {
-      cleanTemplate = replaceInputWithValue(tag?.ai_template, message);
+    if (matchedTag?.ai_template) {
+      cleanTemplate = replaceInputWithValue(matchedTag?.ai_template, message);
 
       const result = await chat.predict(cleanTemplate);
       return result;
@@ -290,10 +299,19 @@ export const processBasicMessageV2 = async ({
       // If no tag exists, use qdrant to find similar tags
     }
   } else {
+    let filter = {};
+    if (workspaceId) {
+      filter = {
+        key: "metadata.workspace_id",
+        match: {
+          value: workspaceId,
+        },
+      };
+    }
     let similarTag = await getDocs({
       message,
       key: "tags",
-      similarityCount: 1,
+      similarityCount: 5,
       filter: {
         should: [
           {
@@ -302,12 +320,7 @@ export const processBasicMessageV2 = async ({
               value: "system",
             },
           },
-          {
-            key: "metadata.workspace_id",
-            match: {
-              value: workspaceId,
-            },
-          },
+          filter,
         ],
       },
     });
@@ -315,7 +328,7 @@ export const processBasicMessageV2 = async ({
 
     console.log("🚀 ~ file: service.ts:214 ~ similarTag:", similarTag);
 
-    if (similarTag?.[0] && similarTag?.[1] > 0.7) {
+    if (similarTag?.[0] && similarTag?.[1] > 0.8) {
       const tag = await prisma.tags.findFirst({
         where: {
           id: similarTag[0].metadata.id,
@@ -419,7 +432,7 @@ export const saveMessage = async ({
   originalMessageId?: string;
   storeId?: string;
 }) => {
-  if (!message) throw new Error("Message is empty");
+  if (!message) return "Message is not found";
 
   try {
     let data: {

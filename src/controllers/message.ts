@@ -201,6 +201,7 @@ export function messageRoutes(fastify: FastifyInstance) {
         workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
         storeId: store_id,
         tagKey: metadata?.tag_key,
+        metadata: metadata,
       });
 
       eventManager.emit("send-message", {
@@ -224,58 +225,58 @@ export function messageRoutes(fastify: FastifyInstance) {
     }
   );
 
-  fastify.get("/api/v1/message/free", async (request, reply) => {
-    const { message, user_id } = request.query || {};
+  // fastify.get("/api/v1/message/free", async (request, reply) => {
+  //   const { message, user_id } = request.query || {};
 
-    try {
-      let customer = null;
-      let randomUserIdentity = user_id;
-      // Get/Save customer information
-      if (randomUserIdentity) {
-        customer = await getCustomer({
-          randomUserIdentity,
-        });
-        if (!customer) {
-          // Save customer
-          customer = await saveCustomer({
-            randomUserId: randomUserIdentity,
-          });
-        }
-      }
+  //   try {
+  //     let customer = null;
+  //     let randomUserIdentity = user_id;
+  //     // Get/Save customer information
+  //     if (randomUserIdentity) {
+  //       customer = await getCustomer({
+  //         randomUserIdentity,
+  //       });
+  //       if (!customer) {
+  //         // Save customer
+  //         customer = await saveCustomer({
+  //           randomUserId: randomUserIdentity,
+  //         });
+  //       }
+  //     }
 
-      const userMessage = await saveMessage({
-        message: message,
-        customerId: customer?.id,
-      });
+  //     const userMessage = await saveMessage({
+  //       message: message,
+  //       customerId: customer?.id,
+  //     });
 
-      console.log("userMessage", userMessage);
+  //     console.log("userMessage", userMessage);
 
-      const response = await processBasicMessageV3({
-        message: message,
-        userId: customer?.id,
-        res: reply,
-      });
-      console.log(
-        "🚀 ~ file: message.ts:194 ~ fastify.post ~ response:",
-        response?.result
-      );
+  //     const response = await processBasicMessageV3({
+  //       message: message,
+  //       userId: customer?.id,
+  //       res: reply,
+  //     });
+  //     console.log(
+  //       "🚀 ~ file: message.ts:194 ~ fastify.post ~ response:",
+  //       response?.result
+  //     );
 
-      // await saveMessage({
-      //   message: response?.text || response.result,
-      //   originalMessageId: userMessage.id,
-      // });
+  //     // await saveMessage({
+  //     //   message: response?.text || response.result,
+  //     //   originalMessageId: userMessage.id,
+  //     // });
 
-      reply.send({
-        success: true,
-        data: {
-          message: response?.result.content,
-          customer: customer?.id,
-        },
-      });
-    } catch (error) {
-      console.log(error);
-    }
-  });
+  //     reply.send({
+  //       success: true,
+  //       data: {
+  //         message: response?.result.content,
+  //         customer: customer?.id,
+  //       },
+  //     });
+  //   } catch (error) {
+  //     console.log(error);
+  //   }
+  // });
 
   fastify.get("/api/v1/message/:store_id", async (request, reply) => {
     const { store_id } = request.params || {};
