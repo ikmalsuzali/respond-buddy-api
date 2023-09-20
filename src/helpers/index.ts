@@ -26,6 +26,16 @@ export const getValidEmails = (str: string | undefined) => {
   return validEmailList;
 };
 
+export const replaceInputWithValue = (
+  inputString: string | null,
+  replacementValue: string
+) => {
+  if (!inputString) return "";
+  const pattern = /\[input\]/g;
+  const replacedString = inputString.replace(pattern, replacementValue);
+  return replacedString || "";
+};
+
 export const nameToKey = (name: string | undefined) => {
   if (!name || typeof name !== "string") {
     return "";

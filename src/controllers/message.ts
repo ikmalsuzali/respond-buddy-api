@@ -11,6 +11,8 @@ import {
   saveMessage,
 } from "../app/message/service";
 import { getCustomer, saveCustomer } from "../app/customer/service";
+import { Readable } from "stream";
+import { OpenAI } from "langchain/llms/openai";
 
 export function messageEvents(fastify: FastifyInstance) {
   eventManager.on("workflow", async (data: any) => {
@@ -195,6 +197,7 @@ export function messageRoutes(fastify: FastifyInstance) {
     "/api/v1/message",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { message, store_id, user_identity, metadata } = request.body || {};
+      console.log(request.body);
 
       const botResponse = await processBasicMessageV2({
         message: message,
@@ -202,6 +205,7 @@ export function messageRoutes(fastify: FastifyInstance) {
         storeId: store_id,
         tagKey: metadata?.tag_key,
         metadata: metadata,
+        reply,
       });
 
       eventManager.emit("send-message", {
@@ -214,13 +218,6 @@ export function messageRoutes(fastify: FastifyInstance) {
 
       eventManager.emit("deduct-credit", {
         workspaceId: request?.token_metadata?.custom_metadata?.workspace_id,
-      });
-
-      reply.send({
-        success: true,
-        data: {
-          message: botResponse,
-        },
       });
     }
   );
@@ -303,7 +300,6 @@ export function messageRoutes(fastify: FastifyInstance) {
       "🚀 ~ file: message.ts:239 ~ fastify.get ~ free_user_id:",
       free_user_id
     );
-    request.to;
 
     if (!request?.token_metadata?.custom_metadata?.user_id && !free_user_id)
       reply.send({ success: false, messages: [] });
@@ -339,6 +335,49 @@ export function messageRoutes(fastify: FastifyInstance) {
     } catch (error) {
       console.log(error);
     }
+  });
+
+  // Write function to stream langchain output to the user
+  fastify.post("/api/v1/message/stream", async (request, reply) => {
+    const model = new OpenAI({
+      streaming: true,
+    });
+
+    const readableStream = new Readable();
+    readableStream._read = () => {};
+
+    reply.header("Content-Type", "application/json; charset=utf-8");
+    reply.send(readableStream);
+
+    // Simulate asynchronous processing of the request
+    // setTimeout(() => {
+    //   // Push the desired data down the stream
+    //   readableStream.push(JSON.stringify({ message: Date() }));
+    // }, 1000);
+
+    // Loop
+    // setInterval(() => {
+    //   // Push the desired data down the stream
+    //   readableStream.push(JSON.stringify({ message: Date() }));
+    // }, 1000);
+
+    const response = await model.call(
+      "Write a 500 paragraph of random stuff.",
+      {
+        callbacks: [
+          {
+            handleLLMNewToken(token: string) {
+              console.log({ token }.token);
+              let tokenString = JSON.stringify({ token }.token);
+              readableStream.push(tokenString);
+              console.log({ token });
+            },
+          },
+        ],
+      }
+    );
+
+    readableStream.push(null);
   });
 
   fastify.post("/api/v1/function/test", async (request, reply) => {
