@@ -214,7 +214,6 @@ export const processBasicMessageV2 = async ({
 
   if (tagKey) {
     return await handleTagKey({ tagKey, workspaceId, message, reply });
-    
   }
 
   console.log(reply);
