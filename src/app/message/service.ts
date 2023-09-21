@@ -139,6 +139,7 @@ export const chatGptStream = async ({
   readableStream._read = () => {};
 
   reply.header("Content-Type", "application/json; charset=utf-8");
+  reply.header("Transfer-Encoding", "chunked");
   reply.send(readableStream);
 
   const response = await model.call([new HumanMessage(message)], {
