@@ -12,6 +12,7 @@ import { websiteRoutes } from "./controllers/website";
 import { messageRoutes } from "./controllers/message";
 import { tagsRoutes } from "./controllers/tags";
 import { userRoutes } from "./controllers/users";
+import { templateRoutes } from "./controllers/template";
 
 export function registerRoutes(fastify: FastifyInstance) {
   stripeRoutes(fastify);
@@ -27,4 +28,5 @@ export function registerRoutes(fastify: FastifyInstance) {
   messageRoutes(fastify);
   tagsRoutes(fastify);
   userRoutes(fastify);
+  templateRoutes(fastify);
 }

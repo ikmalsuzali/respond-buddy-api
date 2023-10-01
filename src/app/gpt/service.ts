@@ -50,7 +50,9 @@ const categorizePrompt = async ({
   type?: string;
   workspaceId?: string;
 }) => {
-  const llm = new OpenAIChat();
+  const llm = new OpenAIChat({
+    modelName: "gpt-4-32k",
+  });
   if (type === "summarize" || message.includes("Summarize:")) {
     if (message.length <= 5000) {
       const summarizeTemplate = `Hey ChatGPT. Summarize the following text: {input}`;
@@ -154,7 +156,6 @@ const regexArray = (string: string) => {
 };
 
 export const multiPromptChain = () => {
-
   const llm = new OpenAIChat({
     streaming: true,
   });

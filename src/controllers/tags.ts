@@ -17,13 +17,10 @@ export function tagsRoutes(fastify: FastifyInstance) {
     "/api/v1/tags",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const page = Number(request.query.page) || 1;
-      const limit = Number(request.query.limit) || 12;
+      const limit = Number(request.query.limit) || 20;
       const search = request.query.search || "";
-      // Get all system tags and filter tags by workspace
 
-      let filter = {};
-
-      filter = {
+      let filter = {
         OR: [
           {
             name: {
@@ -48,16 +45,24 @@ export function tagsRoutes(fastify: FastifyInstance) {
           {
             OR: [
               {
-                workspace:
-                  request?.token_metadata?.custom_metadata.workspace_id,
-              },
-              {
                 is_system_tag: true,
               },
             ],
           },
+          {
+            is_hidden: false,
+          },
         ],
       };
+
+      // Add workspace filter if workspace_id is available
+      const workspaceId =
+        request?.token_metadata?.custom_metadata?.workspace_id;
+      if (workspaceId) {
+        filter.AND[0].OR.push({
+          workspace: workspaceId,
+        });
+      }
 
       try {
         const tags = await prisma.tags.findMany({
@@ -68,7 +73,7 @@ export function tagsRoutes(fastify: FastifyInstance) {
             is_system_tag: "desc",
           },
           skip: (page - 1) * limit,
-          take: limit, // Limit the number of items taken
+          take: limit,
         });
 
         const totalTags = await prisma.tags.count({
@@ -76,6 +81,8 @@ export function tagsRoutes(fastify: FastifyInstance) {
             ...filter,
           },
         });
+
+        console.log(tags);
 
         reply.send({
           data: tags,
@@ -89,7 +96,6 @@ export function tagsRoutes(fastify: FastifyInstance) {
       }
     }
   );
-
   // Create tags
   fastify.post(
     "/api/v1/tag",

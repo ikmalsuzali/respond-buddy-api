@@ -3,12 +3,11 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { eventManager } from "../main";
 import { prisma } from "../prisma";
 import {
-  processBasicMessage,
   processBasicMessageV2,
-  processBasicMessageV3,
   processMessage,
   runFunction,
   saveMessage,
+  structuredOutput,
 } from "../app/message/service";
 import { getCustomer, saveCustomer } from "../app/customer/service";
 import { Readable } from "stream";
@@ -387,10 +386,24 @@ export function messageRoutes(fastify: FastifyInstance) {
       reply.send({ success: false, message: "Missing parameters" });
     }
 
+    // Call prisma to get tag by function name
+    const tag = await prisma.tags.findFirst({
+      where: {
+        function: tag_function,
+      },
+    });
+
+    let data = await structuredOutput({ message, tag });
+    data.workspaceId = request?.token_metadata?.custom_metadata?.workspace_id;
+
+    if (data.error) {
+      reply.send({ success: false, message: data.error.join("\n") });
+    }
+
     const response = await runFunction({
-      tagFunction: tag_function,
+      tag,
       message,
-      metadata,
+      metadata: data,
     });
 
     reply.send({ success: true, message: response });

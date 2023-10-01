@@ -6,9 +6,116 @@ import { loadSummarizationChain } from "langchain/chains";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import { replaceInputWithValue } from "../../helpers";
 import { loadQAStuffChain } from "langchain/chains";
+import { gotScraping } from "got-scraping";
 
-// Function to summarize text using OpenAI
-export const extractFromHtml = async ({
+export const websiteScrapeConfig = [
+  {
+    url: "https://www.google.com/search",
+    selectors: {
+      results: ".tF2Cxc",
+      title: {
+        selector: "h3",
+        action: "text",
+      },
+      link: {
+        selector: "a",
+        action: "attr",
+        attribute: "href",
+      },
+      snippet: {
+        selector: ".IsZvec",
+        action: "text",
+      },
+    },
+  },
+  {
+    url: "https://medium.com/some-blog/some-article-id",
+    selectors: {
+      title: {
+        selector: "h1",
+        action: "text",
+      },
+      claps: {
+        selector: ".js-multirecommendCountButton",
+        action: "text",
+      },
+      content: {
+        selector: "article",
+        action: "html",
+      },
+      author: {
+        selector:
+          ".ds-link.ds-link--styleSubtle.link.link--darken.link--accent.u-accentColor--textNormal.u-accentColor--textDarken",
+        action: "text",
+      },
+    },
+  },
+];
+
+// export const configurableScrape = async (config) => {
+//   try {
+//     const response = await got(config.url);
+//     const $ = cheerio.load(response.body);
+
+//     let results = [];
+//     $(config.selectors.results).each((index, element) => {
+//       let item = {};
+
+//       for (let [key, value] of Object.entries(config.selectors)) {
+//         if (key !== "results") {
+//           switch (value.action) {
+//             case "text":
+//               item[key] = $(element).find(value.selector).text().trim();
+//               break;
+//             case "attr":
+//               item[key] = $(element).find(value.selector).attr(value.attribute);
+//               break;
+//             // Add more cases if you have other actions in the config
+//           }
+//         }
+//       }
+
+//       results.push(item);
+//     });
+
+//     console.log(results);
+//   } catch (error) {
+//     console.error(`Error fetching the page: ${error.message}`);
+//   }
+// };
+
+export const fetchHTML = async ({ metadata }) => {
+  let response = await gotScraping.get({
+    url: metadata.url,
+    proxyUrl: "https://sp5bvv5sca:b0p77Jnlemf5jbFNmX@us.smartproxy.com:10000",
+  });
+
+  console.log(response.body);
+
+  return response.body;
+};
+
+export const getHtmlBody = async ({ metadata }) => {
+  const body = await fetchHTML({ metadata });
+  const removalFunction = [
+    removeExtraElements,
+    removeCss,
+    removeScripts,
+    removeForm,
+  ];
+
+  let $ = cheerio.load(body);
+
+  if (removalFunction?.length !== 0) {
+    for (let i = 0; i < removalFunction?.length; i++) {
+      $ = removalFunction[i]($);
+    }
+  }
+  const response = extractAllTextFromData($);
+  return response;
+};
+
+const extractFromHtml = async ({
   message = "",
   metadata = {
     url_body_content: "",
@@ -59,6 +166,12 @@ export const summarizeText = async (text) => {
     input_documents: docs,
   });
   return res.text;
+};
+
+export const extractHtmlBody = ($) => {
+  const bodyInnerHTML = $("body").html();
+
+  return bodyInnerHTML;
 };
 
 export const extractLinks = ($) => {
@@ -140,6 +253,7 @@ export const createList = async ({
 }) => {
   const chat = new OpenAI({
     modelName: "gpt-4",
+    maxRetries: 3,
   });
 
   const cheerio = await extractFromHtml({
@@ -166,7 +280,7 @@ export const createList = async ({
 
     console.log(result);
 
-    return result;
+    return result.text;
   }
   return "Sorry I couldnt find and audience, please try again.";
 };

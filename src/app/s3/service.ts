@@ -5,6 +5,63 @@ import axios from "axios";
 import fs from "fs";
 import os from "os";
 
+export const storeS3Buffer = async ({
+  buffer,
+  filename,
+  key,
+  workspaceId,
+  userId,
+  allowedExtensions = [
+    ".csv",
+    ".xls",
+    ".xlsx",
+    ".doc",
+    ".docx",
+    ".db",
+    ".txt",
+    ".pdf",
+    ".html",
+    ".XLSX",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".webp",
+  ],
+}: {
+  buffer: Buffer;
+  filename?: string;
+  workspaceId?: string | null;
+  key?: string;
+  userId?: string;
+  allowedExtensions?: string[];
+}) => {
+  try {
+    const extension = path?.extname(filename || "");
+
+    if (allowedExtensions.includes(extension)) {
+      const newKey = `${key}_${workspaceId}_${Date.now()}${extension}`;
+      const uploadParams = {
+        Bucket: "respondbuddy",
+        Key: newKey,
+        Body: buffer,
+        ACL: "public-read",
+      };
+
+      const data = await s3.send(new PutObjectCommand(uploadParams));
+      console.log("File uploaded successfully:", data);
+      return {
+        data,
+        newKey,
+        url: `https://respondbuddy.sfo3.cdn.digitaloceanspaces.com/${newKey}`,
+      };
+    }
+
+    throw new Error("File type not supported");
+  } catch (error) {
+    console.error("Error uploading file:", error);
+  }
+};
+
 export const storeS3File = async ({
   file,
   key,

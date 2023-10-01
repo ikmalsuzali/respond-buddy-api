@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { z } from "zod";
 import {
   ConversationChain,
   LLMChain,
@@ -15,14 +16,24 @@ import { PromptTemplate } from "langchain/prompts";
 import { multiPromptChain } from "../gpt/service";
 import { getDocs } from "../qdrant/service";
 import { HumanMessage } from "langchain/schema";
+import { StructuredOutputParser } from "langchain/output_parsers";
 import {
   extractFirstURL,
   summarizeWebsite,
 } from "../function/summarizeWebsite";
 import { getWebsiteLinks } from "../function/findAllWebsiteLinks";
-import { createList, findAudience } from "../function/cleanWebsite";
+import {
+  createList,
+  extractFromHtml,
+  fetchHTML,
+  findAudience,
+  getHtmlBody,
+} from "../function/cleanWebsite";
 import { FastifyReply } from "fastify";
 import { Readable } from "stream";
+import { downloadAndConvertImageFormat } from "../function/convertImage";
+import { downloadAndCompressImage } from "../function/compressImage";
+import { downloadAndResizeImage } from "../function/resizeImage";
 
 export const processMessage = async ({
   message,
@@ -138,8 +149,8 @@ export const chatGptStream = async ({
   const readableStream = new Readable();
   readableStream._read = () => {};
 
-  reply.header("Content-Type", "application/json; charset=utf-8");
   reply.header("Transfer-Encoding", "chunked");
+  reply.header("Content-Type", "application/json; charset=utf-8");
   reply.send(readableStream);
 
   const response = await model.call([new HumanMessage(message)], {
@@ -380,7 +391,7 @@ const handleTagKey = async ({
     });
 
     if (!relatedTag) {
-      return await chatGptStream({
+      await chatGptStream({
         message,
         workspaceId,
         reply,
@@ -481,9 +492,57 @@ const replaceInputWithValue = (
   return replacedString || "";
 };
 
-export const runFunction = async ({ tagFunction, message, metadata, tag }) => {
-  if (!tagFunction) return "Sorry, I cannot run this now.";
-  switch (tagFunction) {
+export const runFunction = async ({ message, metadata, tag }) => {
+  if (!tag?.function) return "Sorry, I cannot run this now.";
+  switch (tag.function) {
+    case "image-resize": {
+      console.log(metadata);
+      let structuredData = await structuredOutput({
+        message,
+        tag,
+      });
+      return await downloadAndResizeImage({
+        url: structuredData.url,
+        width: structuredData?.width || 300,
+        height: structuredData?.height || null,
+        workspaceId: metadata.workspaceId || "",
+      });
+    }
+    case "image-convert": {
+      let structuredData = await structuredOutput({
+        message,
+        tag,
+      });
+      return await downloadAndConvertImageFormat({
+        url: structuredData.url,
+        format: structuredData.format,
+        workspaceId: metadata.workspaceId || "",
+      });
+    }
+    case "image-compress": {
+      let structuredData = await structuredOutput({
+        message,
+        tag,
+      });
+      console.log(
+        "🚀 ~ file: service.ts:527 ~ runFunction ~ structuredData:",
+        structuredData
+      );
+      return await downloadAndCompressImage({
+        url: structuredData.url,
+        quality: structuredData.quality
+          ? 100 - Number(structuredData.quality)
+          : 80,
+        workspaceId: metadata.workspaceId || "",
+      });
+      break;
+    }
+    case "extract-html-body":
+      return await getHtmlBody({ metadata });
+    case "extract-html":
+      return await fetchHTML({
+        metadata,
+      });
     case "find-all-website-links":
       return await getWebsiteLinks({
         message,
@@ -524,309 +583,117 @@ export const runFunction = async ({ tagFunction, message, metadata, tag }) => {
   }
 };
 
-// export const processBasicMessageV3 = async ({
-//   message,
-//   userId,
-//   res,
-// }: {
-//   message: string;
-//   userId: string;
-//   res?: any;
-// }) => {
-//   let aggregatedTokens = [];
+export const structuredOutput = async ({ message, tag }) => {
+  // We can use zod to define a schema for the output using the `fromZodSchema` method of `StructuredOutputParser`.
+  if (!tag?.structured_output) return "Sorry, I cannot run this now.";
+  const zodTransfomer = transformToZodSchema(tag.structured_output);
+  const parser = StructuredOutputParser.fromZodSchema(zodTransfomer);
 
-//   const chat = new ChatOpenAI({
-//     streaming: true,
-//   });
-//   res.header("Content-Type", "application/octet-stream");
+  const formatInstructions = parser.getFormatInstructions();
 
-//   if (!message) throw new Error("Message is empty");
+  const prompt = new PromptTemplate({
+    template:
+      "Answer the users question as best as possible.\n{format_instructions}\n{question}",
+    inputVariables: ["question"],
+    partialVariables: { format_instructions: formatInstructions },
+  });
 
-//   // Check how messages sent based on userId
-//   // If message >= 10, return message reached max limit for the day
+  const model = new OpenAI({ temperature: 0 });
 
-//   try {
-//     // const prompt = PromptTemplate.fromTemplate(message);
+  const input = await prompt.format({
+    question: message,
+  });
+  const response = await model.call(input);
 
-//     // const chain = new LLMChain({
-//     //   llm: new OpenAI({
-//     //     // temperature: 0.1,
-//     //   }),
-//     //   prompt,
-//     // });
-//     let count = 0;
+  console.log(input);
+  /*
+Answer the users question as best as possible.
+The output should be formatted as a JSON instance that conforms to the JSON schema below.
 
-//     const response = await chat.call([new HumanMessage(message)], {
-//       callbacks: [
-//         {
-//           handleLLMNewToken(token: string) {
-//             console.log("New token:", token);
-//             aggregatedTokens.push(token);
-//             count++;
-//             res.sse({ id: count, data: token });
-//           },
-//         },
-//       ],
-//     });
+As an example, for the schema {{"properties": {{"foo": {{"title": "Foo", "description": "a list of strings", "type": "array", "items": {{"type": "string"}}}}}}, "required": ["foo"]}}}}
+the object {{"foo": ["bar", "baz"]}} is a well-formatted instance of the schema. The object {{"properties": {{"foo": ["bar", "baz"]}}}} is not well-formatted.
 
-//     if (!response) {
-//       return {
-//         result: "Sorry, nothing I can find here",
-//       };
-//     }
+Here is the output schema:
+```
+{"type":"object","properties":{"answer":{"type":"string","description":"answer to the user's question"},"sources":{"type":"array","items":{"type":"string"},"description":"sources used to answer the question, should be websites."}},"required":["answer","sources"],"additionalProperties":false,"$schema":"http://json-schema.org/draft-07/schema#"}
+```
 
-//     res.sse();
+What is the capital of France?
+*/
 
-//     return {
-//       // @ts-ignore
-//       result: response,
-//     };
-//   } catch (error) {
-//     console.log(error);
-//   }
-// };
+  console.log("response", response);
+  /*
+{"answer": "Paris", "sources": ["https://en.wikipedia.org/wiki/Paris"]}
+*/
 
-// export const processBasicMessageV2 = async ({
-//   message,
-//   workspaceId,
-//   storeIds = [],
-//   tagKey,
-//   metadata,
-// }: {
-//   message: string;
-//   workspaceId?: string;
-//   storeIds?: string[];
-//   tagKey?: string;
-//   metadata?: any;
-// }) => {
-//   const chat = new ChatOpenAI({});
+  console.log("parsedResponse", await parser.parse(response));
+  let parsedResponse = await parser.parse(response);
+  const errorMessage = validateInput(parsedResponse, tag.structured_output);
+  if (errorMessage) {
+    return {
+      error: errorMessage,
+    };
+  }
+  return await parser.parse(response);
+};
 
-//   if (!message) throw new Error("Message is empty");
+export const validateInput = (input, structure) => {
+  const errors = [];
 
-//   // Get all tags that workspace and is_system_tag = true
-//   const tags = await prisma.tags.findMany({
-//     where: {
-//       OR: [{ is_system_tag: true }, { workspace: workspaceId }],
-//     },
-//   });
+  // Check each key in the structured output
+  for (const key in structure) {
+    // Check if the key is required and missing in the input
+    if (structure[key].required && !(key in input)) {
+      errors.push(structure[key].error);
+    }
 
-//   let matchedTag = {};
-//   let lowercaseMessage = message.toLowerCase();
+    // Check if the type of the input value matches the expected type
+    else if (key in input && typeof input[key] !== structure[key].type) {
+      errors.push(structure[key].error);
+    }
+  }
 
-//   tags.forEach(async (tag) => {
-//     if (!tag.base_message || !tag.base_message.length) return;
-//     if (matchedTag.id) return;
+  // If no errors, return null
+  return errors.length > 0 ? errors : null;
+};
 
-//     tag.base_message.forEach((baseMessage) => {
-//       if (matchedTag.id) return;
-//       baseMessage = baseMessage.toLowerCase();
-//       if (lowercaseMessage.includes(baseMessage)) {
-//         matchedTag = tag;
-//         return;
-//       }
-//     });
+const transformToZodSchema = (config) => {
+  let schema = {};
+  for (let field in config) {
+    let fieldConfig = config[field];
+    let fieldSchema;
 
-//     if (matchedTag.id) return;
-//   });
+    // Check the type and create corresponding zod schema
+    switch (fieldConfig.type) {
+      case "string":
+        fieldSchema = z.string();
+        break;
+      // Add other types here as needed
+      // case 'number':
+      //   fieldSchema = z.number();
+      //   break;
+      default:
+        throw new Error(`Unsupported type: ${fieldConfig.type}`);
+    }
 
-//   if (matchedTag.id) {
-//     if (workspaceId && matchedTag.command_type === "respond") {
-//       let similarDoc = await getDocs({
-//         message,
-//         key: workspaceId,
-//         similarityCount: 1,
-//         filter: {
-//           should: [
-//             {
-//               key: "metadata.workspace_id",
-//               match: {
-//                 value: workspaceId,
-//               },
-//             },
-//           ],
-//         },
-//       });
+    // Check if the field is required
+    if (fieldConfig.required) {
+      fieldSchema = fieldSchema.nonempty();
+    } else {
+      fieldSchema = fieldSchema.optional();
+    }
 
-//       if (similarDoc?.[0]) {
-//         const result = await chat.predict(
-//           `Answer this: ${message}, using this information: ${similarDoc?.[0].pageContent}`
-//         );
+    // Check if there is a default value
+    if (fieldConfig.default !== undefined) {
+      fieldSchema = fieldSchema.default(fieldConfig.default);
+    }
 
-//         return result;
-//       }
-//     }
+    // Add description if it exists
+    if (fieldConfig.description) {
+      fieldSchema = fieldSchema.describe(fieldConfig.description);
+    }
 
-//     if (matchedTag.function) {
-//       const functionResponse = await runFunction({
-//         tagFunction: matchedTag.function,
-//         message,
-//         metadata,
-//         tag: matchedTag,
-//       });
-
-//       return functionResponse;
-//     }
-
-//     let cleanTemplate = message;
-//     if (matchedTag?.ai_template) {
-//       cleanTemplate = replaceInputWithValue(matchedTag?.ai_template, message);
-
-//       const result = await chat.predict(cleanTemplate);
-//       return result;
-//     }
-//   }
-
-//   if (tagKey) {
-//     // Check if tag has a key
-//     const tag = await prisma.tags.findFirst({
-//       where: {
-//         key: tagKey,
-//       },
-//     });
-
-//     // If tag has a key and has ai template refer to that prompt
-//     // If tag has no ai template, use basic prompt
-//     if (tag) {
-//       // Write a regex to replace [input] with message
-//       if (workspaceId && tag.command_type === "respond") {
-//         let similarDoc = await getDocs({
-//           message,
-//           key: workspaceId,
-//           similarityCount: 1,
-//           filter: {
-//             should: [
-//               {
-//                 key: "metadata.workspace_id",
-//                 match: {
-//                   value: workspaceId,
-//                 },
-//               },
-//             ],
-//           },
-//         });
-
-//         if (similarDoc?.[0]) {
-//           const result = await chat.predict(
-//             `Answer this: ${message} using this information: ${similarDoc?.[0].pageContent}`
-//           );
-
-//           return result;
-//         }
-//       }
-//       let cleanTemplate = message;
-//       if (tag?.ai_template) {
-//         cleanTemplate = replaceInputWithValue(tag?.ai_template, message);
-//       }
-
-//       const result = await chat.predict(cleanTemplate);
-//       return result;
-
-//       // If no tag exists, use qdrant to find similar tags
-//     }
-//   } else {
-//     let filter = {};
-//     if (workspaceId) {
-//       filter = {
-//         key: "metadata.workspace_id",
-//         match: {
-//           value: workspaceId,
-//         },
-//       };
-//     }
-//     let similarTag = await getDocs({
-//       message,
-//       key: "tags",
-//       similarityCount: 5,
-//       filter: {
-//         should: [
-//           {
-//             key: "metadata.type",
-//             match: {
-//               value: "system",
-//             },
-//           },
-//           filter,
-//         ],
-//       },
-//     });
-//     // Need to check most similar tag > 60% match
-
-//     console.log("🚀 ~ file: service.ts:214 ~ similarTag:", similarTag);
-
-//     if (similarTag?.[0] && similarTag?.[1] > 0.8) {
-//       const tag = await prisma.tags.findFirst({
-//         where: {
-//           id: similarTag[0].metadata.id,
-//         },
-//       });
-
-//       // If no tag revert back to basic prompt
-//       if (!tag) {
-//         const result = await chat.predict(message);
-
-//         return result;
-//         // If no tag has ai template, use basic prompt
-//       } else {
-//         let cleanTemplate = message;
-//         if (tag?.ai_template) {
-//           cleanTemplate = replaceInputWithValue(tag?.ai_template, message);
-//         }
-
-//         const result = await chat.predict(cleanTemplate);
-//         return result;
-//       }
-//       // Use basic prompt
-//     } else {
-//       const result = await chat.predict(message);
-
-//       return result;
-//     }
-//   }
-// };
-
-// export const processBasicMessage = async ({
-//   message,
-//   userId,
-// }: {
-//   message: string;
-//   userId: string;
-// }) => {
-//   if (!message) throw new Error("Message is empty");
-
-//   // Check how messages sent based on userId
-//   // If message >= 10, return message reached max limit for the day
-
-//   try {
-//     // const prompt = PromptTemplate.fromTemplate(message);
-
-//     // const chain = new LLMChain({
-//     //   llm: new OpenAI({
-//     //     // temperature: 0.1,
-//     //   }),
-//     //   prompt,
-//     // });
-
-//     const response = await multiPromptChain().call({
-//       input: message,
-//     });
-//     console.log(
-//       "🚀 ~ file: service.ts:128 ~ runMultiPromptChain ~ response",
-//       response
-//     );
-
-//     console.log(response);
-
-//     if (!response) {
-//       return {
-//         result: "Sorry, nothing I can find here",
-//       };
-//     }
-
-//     return {
-//       // @ts-ignore
-//       result: response.text,
-//     };
-//   } catch (error) {
-//     console.log(error);
-//   }
-// };
+    schema[field] = fieldSchema;
+  }
+  return z.object(schema);
+};
