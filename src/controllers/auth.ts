@@ -132,7 +132,7 @@ export function authRoutes(fastify: FastifyInstance) {
       if (!publicUser) {
         publicUser = await prisma.users.create({
           data: {
-            username: username || user?.email,
+            username: user?.email,
             email: user?.email,
             user_id: user?.id,
           },
