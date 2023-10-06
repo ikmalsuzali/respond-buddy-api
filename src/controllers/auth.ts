@@ -89,6 +89,14 @@ export function authRoutes(fastify: FastifyInstance) {
         workspace_description,
       } = request.body || {};
 
+      if (!email || !password) {
+        throw new Error("Email and password are required");
+      }
+
+      if (password.length < 6) {
+        throw new Error("Password must be at least 8 characters long");
+      }
+
       if (password !== confirm_password) {
         throw new Error("Passwords do not match");
       }
@@ -101,15 +109,7 @@ export function authRoutes(fastify: FastifyInstance) {
         },
       });
 
-      // const foundUser = await prisma.users.findFirst({
-      //   where: {
-      //     username: username,
-      //   },
-      // });
-
       if (checkUniqueEmail) return new Error("Email already exists");
-
-      // if (foundUser) return new Error("Username already exists");
 
       const { user, session, error } = await supabase.auth.signUp({
         email,
@@ -119,8 +119,7 @@ export function authRoutes(fastify: FastifyInstance) {
       if (!user) throw new Error("User already created");
 
       // Create prisma user if not exists
-      let publicUser = null;
-      publicUser = await prisma.users.findFirst({
+      let publicUser = await prisma.users.findFirst({
         where: {
           email: user?.email,
           user_id: user?.id,

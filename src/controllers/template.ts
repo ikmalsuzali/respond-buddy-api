@@ -6,6 +6,7 @@ import { BufferMemory, ChatMessageHistory } from "langchain/memory";
 import { ConversationChain } from "langchain/chains";
 import { AIMessage, HumanMessage } from "langchain/schema";
 import { ChatOpenAI } from "langchain/chat_models/openai";
+import { OpenAI } from "langchain/llms/openai";
 
 export function templateRoutes(fastify: FastifyInstance) {
   fastify.get(
@@ -135,13 +136,13 @@ export function templateRoutes(fastify: FastifyInstance) {
           chatHistory: new ChatMessageHistory(messageHistory || []),
         });
 
-        const model = new ChatOpenAI({
+        const model = new OpenAI({
           modelName: "gpt-3.5-turbo",
         });
         const chain = new ConversationChain({
-          llmKwargs: 1,
           llm: model,
           memory: memory,
+          
         });
 
         const { tag, message } = await executeFunction({
@@ -248,7 +249,7 @@ export function templateRoutes(fastify: FastifyInstance) {
       });
     } else {
       functionMessage = await chain.call({
-        input: tag?.ai_template,
+        input: tag?.ai_template + ":" + previousResult,
       });
     }
 

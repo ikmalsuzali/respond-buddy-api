@@ -143,7 +143,7 @@ export const getNextRenewalDate = (subscription: any) => {
       break;
     // Add cases for other types if needed
     default:
-      throw new Error("Unknown plan_type");
+      createdAt.setMonth(createdAt.getMonth() + 1);
   }
 
   return createdAt.toISOString();

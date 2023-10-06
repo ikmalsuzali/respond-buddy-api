@@ -535,7 +535,6 @@ export const runFunction = async ({ message, metadata, tag }) => {
           : 80,
         workspaceId: metadata.workspaceId || "",
       });
-      break;
     }
     case "extract-html-body":
       return await getHtmlBody({ metadata });
