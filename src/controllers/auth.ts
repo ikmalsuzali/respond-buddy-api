@@ -164,7 +164,7 @@ export function authRoutes(fastify: FastifyInstance) {
       const freeSubscription = await prisma.stripe_products.findFirst({
         where: {
           key: "free",
-          env: fastify.config.ENVIRONMENT === "demo" ? "demo" : "prod",
+          env: fastify.config.ENVIRONMENT === "demo" ? "demo" : "live",
         },
       });
 
