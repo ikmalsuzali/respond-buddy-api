@@ -146,11 +146,11 @@ const main = async () => {
     },
   });
 
-  redisClient = createClient({
-    url: process.env.REDIS_URL,
-  });
+  // redisClient = createClient({
+  //   url: process.env.REDIS_URL,
+  // });
 
-  await redisClient.connect();
+  // await redisClient.connect();
 
   const envToLogger = {
     transport: {

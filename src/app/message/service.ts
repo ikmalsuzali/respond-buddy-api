@@ -75,21 +75,6 @@ export const processMessage = async ({
       const chain = new ConversationChain({ llm: chat, verbose: true });
       const result = await chain.call({ input: message });
 
-      // const chain = new LLMChain({
-      //   llm: new OpenAI({
-      //     temperature: 0.1,
-      //   }),
-      //   prompt,
-      // });
-
-      // const result = await chain.run(prompt);
-      // console.log(
-      //   "🚀 ~ file: service.ts:31 ~ constgetDocsFromRedisInParallel:any=stores.map ~ message:",
-      //   message
-      // );
-
-      // console.log("🚀 ~ file: service.ts:49 ~ result:", result);
-
       if (!result) {
         return {
           result: "Sorry, nothing I can find here",
@@ -201,6 +186,17 @@ export const processBasicMessageV2 = async ({
 }) => {
   if (!message) throw new Error("Message is empty");
 
+  if (tagKey) {
+    return await handleTagKey({
+      tagKey,
+      workspaceId,
+      message,
+      reply,
+      tagWritingStyle: metadata?.tag_writing_style,
+      tagLanguage: metadata?.tag_language,
+      tagTone: metadata?.tag_tone,
+    });
+  }
   // Fetch tags
   const tags = await fetchTags(workspaceId);
 
@@ -214,6 +210,9 @@ export const processBasicMessageV2 = async ({
       message,
       metadata,
       reply,
+      tagWritingStyle: metadata?.tag_writing_style,
+      tagLanguage: metadata?.tag_language,
+      tagTone: metadata?.tag_tone,
     });
 
     return reply.send({
@@ -224,13 +223,14 @@ export const processBasicMessageV2 = async ({
     });
   }
 
-  if (tagKey) {
-    return await handleTagKey({ tagKey, workspaceId, message, reply });
-  }
-
-  console.log(reply);
-
-  return await handleNoMatch({ workspaceId, message, reply });
+  await handleNoMatch({
+    workspaceId,
+    message,
+    reply,
+    tagWritingStyle: metadata?.tag_writing_style,
+    tagLanguage: metadata?.tag_language,
+    tagTone: metadata?.tag_tone,
+  });
 };
 
 // Helper Functions
@@ -271,12 +271,18 @@ const handleMatchedTag = async ({
   message,
   metadata,
   reply,
+  tagWritingStyle,
+  tagLanguage,
+  tagTone,
 }: {
   tag: any;
   workspaceId: string;
   message: string;
   metadata: any;
   reply: FastifyReply;
+  tagWritingStyle?: string;
+  tagLanguage?: string;
+  tagTone?: string;
 }) => {
   if (workspaceId && tag?.command_type === "respond") {
     let similarDoc = await getDocs({
@@ -315,6 +321,24 @@ const handleMatchedTag = async ({
 
   if (tag?.ai_template) {
     let cleanTemplate = replaceInputWithValue(tag.ai_template, message);
+    if (tagWritingStyle || tagLanguage || tagTone) {
+      cleanTemplate += "Please write";
+
+      if (tagTone) {
+        cleanTemplate += ` in ${tagTone} tone`;
+      }
+
+      if (tagWritingStyle) {
+        cleanTemplate += `, ${tagWritingStyle} writing style`;
+      }
+
+      if (tagLanguage) {
+        cleanTemplate += ` and translated into ${tagLanguage} language`;
+      }
+
+      cleanTemplate += ".";
+    }
+
     await chatGptStream({
       message: `${cleanTemplate}`,
       workspaceId,
@@ -330,12 +354,18 @@ const handleTagKey = async ({
   workspaceId,
   message,
   reply,
+  tagWritingStyle,
+  tagLanguage,
+  tagTone,
 }: {
   tagKey: string;
   workspaceId: string;
   message: string;
   chat: any;
   reply: FastifyReply;
+  tagWritingStyle?: string;
+  tagLanguage?: string;
+  tagTone?: string;
 }) => {
   const tag = await prisma.tags.findFirst({
     where: {
@@ -347,73 +377,116 @@ const handleTagKey = async ({
     let cleanTemplate = message;
     if (tag.ai_template) {
       cleanTemplate = replaceInputWithValue(tag.ai_template, message);
+      if (tagWritingStyle || tagLanguage || tagTone) {
+        cleanTemplate += "Please write";
+
+        if (tagTone) {
+          cleanTemplate += ` in ${tagTone} tone`;
+        }
+
+        if (tagWritingStyle) {
+          cleanTemplate += `, ${tagWritingStyle} writing style`;
+        }
+
+        if (tagLanguage) {
+          cleanTemplate += ` and translated into ${tagLanguage} language`;
+        }
+
+        cleanTemplate += ".";
+      }
     }
+
+    console.log(
+      "🚀 ~ file: service.ts:270 ~ handleTagKey ~ cleanTemplate",
+      cleanTemplate
+    );
 
     await chatGptStream({
       message: `${cleanTemplate}`,
       workspaceId,
       reply,
     });
-  }
-
-  let filter = {};
-  if (workspaceId) {
-    filter = {
-      key: "metadata.workspace_id",
-      match: {
-        value: workspaceId,
-      },
-    };
-  }
-
-  let similarTag = await getDocs({
-    message,
-    key: "tags",
-    similarityCount: 5,
-    filter: {
-      should: [
-        {
-          key: "metadata.type",
-          match: {
-            value: "system",
-          },
+  } else {
+    let filter = {};
+    if (workspaceId) {
+      filter = {
+        key: "metadata.workspace_id",
+        match: {
+          value: workspaceId,
         },
-        filter,
-      ],
-    },
-  });
+      };
+    }
 
-  if (similarTag?.[0] && similarTag[1] > 0.8) {
-    const relatedTag = await prisma.tags.findFirst({
-      where: {
-        id: similarTag[0].metadata.id,
+    let similarTag = await getDocs({
+      message,
+      key: "tags",
+      similarityCount: 5,
+      filter: {
+        should: [
+          {
+            key: "metadata.type",
+            match: {
+              value: "system",
+            },
+          },
+          filter,
+        ],
       },
     });
 
-    if (!relatedTag) {
+    if (similarTag?.[0] && similarTag[1] > 0.8) {
+      const relatedTag = await prisma.tags.findFirst({
+        where: {
+          id: similarTag[0].metadata.id,
+        },
+      });
+
+      if (!relatedTag) {
+        await chatGptStream({
+          message,
+          workspaceId,
+          reply,
+        });
+      } else {
+        let cleanTemplate = message;
+        if (relatedTag.ai_template) {
+          cleanTemplate = replaceInputWithValue(
+            relatedTag.ai_template,
+            message
+          );
+
+          if (tagWritingStyle || tagLanguage || tagTone) {
+            cleanTemplate += "Please write";
+
+            if (tagTone) {
+              cleanTemplate += ` in ${tagTone} tone`;
+            }
+
+            if (tagWritingStyle) {
+              cleanTemplate += `, ${tagWritingStyle} writing style`;
+            }
+
+            if (tagLanguage) {
+              cleanTemplate += ` and translated into ${tagLanguage} language`;
+            }
+
+            cleanTemplate += ".";
+          }
+        }
+
+        await chatGptStream({
+          message: `${cleanTemplate}`,
+          workspaceId,
+          reply,
+        });
+      }
+    } else {
       await chatGptStream({
         message,
         workspaceId,
         reply,
       });
-    } else {
-      let cleanTemplate = message;
-      if (relatedTag.ai_template) {
-        cleanTemplate = replaceInputWithValue(relatedTag.ai_template, message);
-      }
-
-      await chatGptStream({
-        message: `${cleanTemplate}`,
-        workspaceId,
-        reply,
-      });
     }
-  } else {
-    await chatGptStream({
-      message,
-      workspaceId,
-      reply,
-    });
   }
 };
 
@@ -421,13 +494,39 @@ const handleNoMatch = async ({
   workspaceId,
   message,
   reply,
+  tagWritingStyle,
+  tagLanguage,
+  tagTone,
 }: {
   workspaceId?: string;
   message: string;
   reply: FastifyReply;
+  tagWritingStyle?: string;
+  tagLanguage?: string;
+  tagTone?: string;
 }) => {
+  let templateMessage = message;
+
+  if (tagWritingStyle || tagLanguage || tagTone) {
+    templateMessage += "Please write";
+
+    if (tagTone) {
+      templateMessage += ` in ${tagTone} tone`;
+    }
+
+    if (tagWritingStyle) {
+      templateMessage += `, ${tagWritingStyle} writing style`;
+    }
+
+    if (tagLanguage) {
+      templateMessage += ` and translated into ${tagLanguage} language`;
+    }
+
+    templateMessage += ".";
+  }
+
   return await chatGptStream({
-    message,
+    message: templateMessage,
     workspaceId,
     reply,
   });

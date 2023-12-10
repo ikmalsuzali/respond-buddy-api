@@ -196,7 +196,7 @@ export function messageRoutes(fastify: FastifyInstance) {
     "/api/v1/message",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { message, store_id, user_identity, metadata } = request.body || {};
-      console.log(request.body);
+      console.log("🚀 ~ file: message.ts:199 ~ metadata:", metadata);
 
       const botResponse = await processBasicMessageV2({
         message: message,
