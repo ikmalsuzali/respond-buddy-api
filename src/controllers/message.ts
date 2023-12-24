@@ -151,6 +151,33 @@ export function messageEvents(fastify: FastifyInstance) {
     });
   });
 
+  eventManager.on("update-tag-usage-count", async (data: any) => {
+    let { tagKey } = data || {};
+
+    console.log("🚀 ~ file: message.ts:199 ~ tagId:", data);
+
+    if (!tagKey) return;
+
+    const tag = await prisma.tags.findFirst({
+      where: {
+        key: tagKey,
+      },
+    });
+
+    if (!tag) return;
+
+    await prisma.tags.update({
+      where: {
+        id: tag.id,
+      },
+      data: {
+        usage_count: {
+          increment: 1,
+        },
+      },
+    });
+  });
+
   eventManager.on("deduct-credit", async (data: any) => {
     let { workspaceId } = data || {};
 
@@ -205,6 +232,11 @@ export function messageRoutes(fastify: FastifyInstance) {
         tagKey: metadata?.tag_key,
         metadata: metadata,
         reply,
+      });
+      console.log("🚀 ~ file: message.ts:236 ~ botResponse:", botResponse);
+
+      eventManager.emit("update-tag-usage-count", {
+        tagKey: metadata?.tag_key,
       });
 
       eventManager.emit("send-message", {

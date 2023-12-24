@@ -55,9 +55,11 @@ export function tagsRoutes(fastify: FastifyInstance) {
         ],
       };
 
-      // if (category) {
-      //   filter.category = category;
-      // }
+      if (category) {
+        filter.AND.push({
+          category,
+        });
+      }
 
       switch (filterType) {
         case "owned":
@@ -113,18 +115,26 @@ export function tagsRoutes(fastify: FastifyInstance) {
           take: limit,
           include: {
             user_liked_tags: true, // Fetch associated liked_by_users for each tag
+            tag_categories: true,
           },
         });
 
         // Modify tags to check if current user has liked
         const tagsWithUserLiked = tags.map((tag) => ({
           ...tag,
-          userHasLiked:
-            tag.user_liked_tags.some((userLike) => userLike.userId === userId)
-              ?.length > 0
+          tag_liked_count: tag.user_liked_tags.length,
+          user_has_liked:
+            tag.user_liked_tags.filter(
+              (userLike) => userLike.user_id === userId
+            )?.length > 0
               ? true
               : false, // Check if current user has liked
         }));
+
+        console.log(
+          "🚀 ~ file: tags.ts:129 ~ tagsWithUserLiked ~ tagsWithUserLiked:",
+          tagsWithUserLiked
+        );
 
         const totalTags = await prisma.tags.count({
           where: {
@@ -133,6 +143,8 @@ export function tagsRoutes(fastify: FastifyInstance) {
         });
 
         console.log(tags);
+
+        console.log("🚀 ~ file: tags.ts:113 ~ request query:", request.query);
 
         reply.send({
           data: tagsWithUserLiked,
@@ -219,6 +231,19 @@ export function tagsRoutes(fastify: FastifyInstance) {
       } catch (error) {
         reply.send(error);
       }
+    }
+  );
+
+  fastify.post(
+    "/api/v1/tag/:id/usage",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      const { id } = request.params;
+
+      if (!id) return new Error("Template id is required");
+
+      eventManager.emit("update-tag-usage-count", {
+        tagKey: tag.key,
+      });
     }
   );
 
@@ -329,43 +354,51 @@ export function tagsRoutes(fastify: FastifyInstance) {
     "/api/v1/tags/:tagId/like-toggle",
     async (request: FastifyRequest, reply: FastifyReply) => {
       const tagId = request.params.tagId;
-      const userId = request?.token_metadata?.user_id; // Assuming the user's ID is stored in the token metadata
+      const userId = request?.token_metadata?.custom_metadata.user_id; // Assuming the user's ID is stored in the token metadata
       const isLiked = request.body.is_liked; // Getting the isLiked parameter from the request body
+
+      console.log("🚀 ~ file: tags.ts:333 ~ tagId:", tagId);
+      console.log("🚀 ~ file: tags.ts:334 ~ userId:", userId);
+      console.log("🚀 ~ file: tags.ts:335 ~ isLiked:", request.body);
 
       if (!userId) {
         reply.status(401).send({ error: "User not authenticated" });
         return;
       }
 
+      if (!tagId) {
+        reply.status(400).send({ error: "Tag id is required" });
+      }
+
       try {
-        const existingLike = await prisma.userLikedTags.findFirst({
+        const existingLike = await prisma.user_liked_tags.findFirst({
           where: {
-            userId: userId,
-            tagId: tagId,
+            user_id: userId,
+            tag_id: tagId,
           },
         });
+        console.log("🚀 ~ file: tags.ts:352 ~ existingLike:", existingLike);
 
         // If the user wants to like, but hasn't already
         if (isLiked && !existingLike) {
-          prisma.userLikedTags.create({
+          await prisma.user_liked_tags.create({
             data: {
-              userId: userId,
-              tagId: tagId,
+              user_id: userId,
+              tag_id: tagId,
             },
           });
           reply.send({ status: "liked" });
+          console.log("🚀 ~ file: tags.ts:367 ~ liked:", isLiked);
         }
         // If the user wants to unlike and has previously liked
         else if (!isLiked && existingLike) {
-          prisma.userLikedTags.delete({
+          await prisma.user_liked_tags.delete({
             where: {
-              userId_tagId: {
-                userId: userId,
-                tagId: tagId,
-              },
+              id: existingLike.id,
             },
           });
           reply.send({ status: "unliked" });
+          console.log("🚀 ~ file: tags.ts:380 ~ unliked:", isLiked);
         } else {
           // Neither liked nor unliked (no action performed)
           reply.send({ status: "no change" });
