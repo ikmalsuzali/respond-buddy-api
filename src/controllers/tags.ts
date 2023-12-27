@@ -11,6 +11,7 @@ import {
 } from "../app/qdrant/service";
 import { Document } from "langchain/document";
 import { nameToKey } from "../helpers";
+import { eventManager } from "../../main";
 
 export function tagsRoutes(fastify: FastifyInstance) {
   fastify.get(
