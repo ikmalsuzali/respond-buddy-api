@@ -176,7 +176,7 @@ export function tagsRoutes(fastify: FastifyInstance) {
       if (!ai_template) return new Error("Prompt template is required");
       if (ai_template && !ai_template.includes("[input]"))
         return new Error("Prompt template must include [input]");
-      if (!description) return new Error("Used description is required");
+      if (!used_description) return new Error("Used description is required");
       if (!category) return new Error("Category is required");
       if (!privacy_type) return new Error("Privacy type is required");
       if (!structured_output.input && !structured_output?.input?.description)
@@ -236,14 +236,14 @@ export function tagsRoutes(fastify: FastifyInstance) {
   );
 
   fastify.post(
-    "/api/v1/tag/:id/usage",
+    "/api/v1/tag/:key/usage",
     async (request: FastifyRequest, reply: FastifyReply) => {
-      const { id } = request.params;
+      const { key } = request.params;
 
-      if (!id) return new Error("Template id is required");
+      if (!key) return new Error("Template key is required");
 
       eventManager.emit("update-tag-usage-count", {
-        tagKey: tag.key,
+        tagKey: key,
       });
     }
   );
