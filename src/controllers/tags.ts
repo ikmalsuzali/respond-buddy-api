@@ -137,6 +137,13 @@ export function tagsRoutes(fastify: FastifyInstance) {
           tagsWithUserLiked
         );
 
+        // Sort tagsWithUserLiked by user_has_liked
+        tagsWithUserLiked.sort((a, b) => {
+          if (a.user_has_liked && !b.user_has_liked) return -1;
+          if (!a.user_has_liked && b.user_has_liked) return 1;
+          return 0;
+        });
+
         const totalTags = await prisma.tags.count({
           where: {
             ...filter,

@@ -198,30 +198,30 @@ export const processBasicMessageV2 = async ({
     });
   }
   // Fetch tags
-  const tags = await fetchTags(workspaceId);
+  // const tags = await fetchTags(workspaceId);
 
   // Match tag with message
-  const matchedTag = matchMessageWithTag({ message, tags });
+  // const matchedTag = matchMessageWithTag({ message, tags });
 
-  if (matchedTag.id) {
-    const response = await handleMatchedTag({
-      tag: matchedTag,
-      workspaceId,
-      message,
-      metadata,
-      reply,
-      tagWritingStyle: metadata?.tag_writing_style,
-      tagLanguage: metadata?.tag_language,
-      tagTone: metadata?.tag_tone,
-    });
+  // if (matchedTag.id) {
+  //   const response = await handleMatchedTag({
+  //     tag: matchedTag,
+  //     workspaceId,
+  //     message,
+  //     metadata,
+  //     reply,
+  //     tagWritingStyle: metadata?.tag_writing_style,
+  //     tagLanguage: metadata?.tag_language,
+  //     tagTone: metadata?.tag_tone,
+  //   });
 
-    return reply.send({
-      success: true,
-      data: {
-        message: response,
-      },
-    });
-  }
+  //   return reply.send({
+  //     success: true,
+  //     data: {
+  //       message: response,
+  //     },
+  //   });
+  // }
 
   await handleNoMatch({
     workspaceId,
@@ -252,8 +252,12 @@ const matchMessageWithTag = ({
   let matchedTag = {};
   let lowercaseMessage = message.toLowerCase();
 
+  if (!tags.length) return matchedTag;
+
   tags.forEach((tag) => {
     if (matchedTag.id) return;
+    console.log("🚀 ~ file: service.ts:267 ~ tags.forEach ~ tag:", tag);
+
     tag.base_message.forEach((baseMessage) => {
       if (matchedTag.id) return;
       if (lowercaseMessage.includes(baseMessage.toLowerCase())) {
@@ -376,7 +380,10 @@ const handleTagKey = async ({
   if (tag) {
     let cleanTemplate = message;
     if (tag.ai_template) {
-      cleanTemplate = replaceInputWithValue(tag.ai_template, message);
+      cleanTemplate = replacePatterns(tag.ai_template, {
+        "\\[input\\]": message,
+        "\\[language\\]": tagLanguage,
+      });
       if (tagWritingStyle || tagLanguage || tagTone) {
         cleanTemplate += "Please write";
 
@@ -505,7 +512,9 @@ const handleNoMatch = async ({
   tagLanguage?: string;
   tagTone?: string;
 }) => {
-  let templateMessage = message;
+  let templateMessage = replacePatterns(message, {
+    "\\[language\\]": tagLanguage,
+  });
 
   if (tagWritingStyle || tagLanguage || tagTone) {
     templateMessage += "Please write";
@@ -530,6 +539,22 @@ const handleNoMatch = async ({
     workspaceId,
     reply,
   });
+};
+
+const replacePatterns = (
+  inputString: string | null,
+  replacements: ReplacementObject
+) => {
+  if (!inputString) return "";
+  let replacedString = inputString;
+  for (const patternString in replacements) {
+    const pattern = new RegExp(patternString, "g");
+    replacedString = replacedString.replace(
+      pattern,
+      replacements[patternString]
+    );
+  }
+  return replacedString || "";
 };
 
 export const saveMessage = async ({
